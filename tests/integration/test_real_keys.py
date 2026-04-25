@@ -2,6 +2,7 @@
 
 各テストは net で副作用ゼロになるよう、進めたあと戻すペアで構成。
 """
+
 import hashlib
 from pathlib import Path
 from time import sleep

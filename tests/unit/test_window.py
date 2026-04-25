@@ -9,7 +9,6 @@ from kindle_cap.window import (
     get_window_geometry,
 )
 
-
 # ---------------------------------------------------------------------------
 # 純粋関数 _parse_geometry_output：mock なしで境界値を網羅
 # ---------------------------------------------------------------------------
@@ -24,9 +23,7 @@ def test_parse_geometry_without_trailing_newline() -> None:
 
 
 def test_parse_geometry_strips_whitespace_around_numbers() -> None:
-    assert _parse_geometry_output(" 0 \n 31 \n 1440 \n 869 \n") == Geometry(
-        0, 31, 1440, 869
-    )
+    assert _parse_geometry_output(" 0 \n 31 \n 1440 \n 869 \n") == Geometry(0, 31, 1440, 869)
 
 
 def test_parse_geometry_accepts_zero_origin_and_size() -> None:
@@ -35,9 +32,7 @@ def test_parse_geometry_accepts_zero_origin_and_size() -> None:
 
 def test_parse_geometry_accepts_negative_origin() -> None:
     # マルチモニタや左端より外側の場合に負の x が返る可能性あり
-    assert _parse_geometry_output("-100\n-50\n1440\n869\n") == Geometry(
-        -100, -50, 1440, 869
-    )
+    assert _parse_geometry_output("-100\n-50\n1440\n869\n") == Geometry(-100, -50, 1440, 869)
 
 
 def test_parse_geometry_accepts_very_large_values() -> None:

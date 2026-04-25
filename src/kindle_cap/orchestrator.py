@@ -1,4 +1,6 @@
 """Orchestrate the capture loop, dry-run, and PDF assembly."""
+
+import contextlib
 import hashlib
 from pathlib import Path
 from time import sleep
@@ -74,10 +76,8 @@ def _capture_book(config: CaptureConfig, *, auto_stop: bool) -> None:
     if not config.keep_png:
         for p in captured:
             p.unlink(missing_ok=True)
-        try:
+        with contextlib.suppress(OSError):
             out_dir.rmdir()
-        except OSError:
-            pass
 
     print(f"完了: {pdf_path}")
 
@@ -87,10 +87,7 @@ def _run_dry(config: CaptureConfig) -> None:
     geom = get_window_geometry()
     dry_path = config.out / "dry_run.png"
     capture_rect(geom, dry_path)
-    print(
-        f"window geometry: x={geom.x} y={geom.y} "
-        f"w={geom.width} h={geom.height}"
-    )
+    print(f"window geometry: x={geom.x} y={geom.y} w={geom.width} h={geom.height}")
     print(f"saved: {dry_path}")
 
 

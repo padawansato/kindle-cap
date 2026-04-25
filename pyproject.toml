@@ -36,6 +36,7 @@ kindle-cap-pdf = "kindle_cap.cli:run_rebuild_pdf"
 dev = [
     "pytest>=8.0",
     "pypdf>=4.0",
+    "ruff>=0.6",
 ]
 
 [tool.pytest.ini_options]
@@ -43,6 +44,34 @@ testpaths = ["tests"]
 markers = [
     "live: requires Kindle.app running with a book on the first page",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort (import sorting)
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # Ruff-specific
+]
+ignore = [
+    "E501",   # line-too-long: ruff format に任せる
+    "RUF001", # ambiguous-unicode-character-string: 日本語多用のため無効化
+    "RUF002", # ambiguous-unicode-character-docstring: 同上
+    "RUF003", # ambiguous-unicode-character-comment: 同上
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ruff.lint.per-file-ignores]
+"src/kindle_cap/cli.py" = ["B008"]  # typer.Option / typer.Argument の標準パターン
+"tests/**/*.py" = ["B017"]  # frozen dataclass の不変性検証で bare Exception を使う
 
 [build-system]
 requires = ["hatchling"]

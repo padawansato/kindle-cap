@@ -21,10 +21,14 @@ def test_capture_with_all_flags(mock_run: MagicMock, tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "--name", "test-book",
-            "--pages", "3",
-            "--direction", "rtl",
-            "--out", str(tmp_path),
+            "--name",
+            "test-book",
+            "--pages",
+            "3",
+            "--direction",
+            "rtl",
+            "--out",
+            str(tmp_path),
         ],
     )
     assert result.exit_code == 0, result.output
@@ -43,9 +47,12 @@ def test_capture_prompts_when_name_missing(mock_run: MagicMock, tmp_path: Path) 
     result = runner.invoke(
         app,
         [
-            "--pages", "3",
-            "--direction", "rtl",
-            "--out", str(tmp_path),
+            "--pages",
+            "3",
+            "--direction",
+            "rtl",
+            "--out",
+            str(tmp_path),
         ],
         input="prompted-name\n",
     )
@@ -60,10 +67,14 @@ def test_capture_dry_run_passed_through(mock_run: MagicMock, tmp_path: Path) -> 
     result = runner.invoke(
         app,
         [
-            "--name", "x",
-            "--pages", "1",
-            "--direction", "ltr",
-            "--out", str(tmp_path),
+            "--name",
+            "x",
+            "--pages",
+            "1",
+            "--direction",
+            "ltr",
+            "--out",
+            str(tmp_path),
             "--dry-run",
         ],
     )
@@ -77,10 +88,14 @@ def test_capture_auto_stop_passed_through(mock_run: MagicMock, tmp_path: Path) -
     result = runner.invoke(
         app,
         [
-            "--name", "x",
-            "--pages", "100",
-            "--direction", "rtl",
-            "--out", str(tmp_path),
+            "--name",
+            "x",
+            "--pages",
+            "100",
+            "--direction",
+            "rtl",
+            "--out",
+            str(tmp_path),
             "--auto-stop",
         ],
     )
@@ -94,10 +109,14 @@ def test_capture_auto_stop_default_false(mock_run: MagicMock, tmp_path: Path) ->
     result = runner.invoke(
         app,
         [
-            "--name", "x",
-            "--pages", "5",
-            "--direction", "rtl",
-            "--out", str(tmp_path),
+            "--name",
+            "x",
+            "--pages",
+            "5",
+            "--direction",
+            "rtl",
+            "--out",
+            str(tmp_path),
         ],
     )
     assert result.exit_code == 0, result.output
@@ -110,10 +129,14 @@ def test_capture_no_keep_png(mock_run: MagicMock, tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "--name", "x",
-            "--pages", "1",
-            "--direction", "ltr",
-            "--out", str(tmp_path),
+            "--name",
+            "x",
+            "--pages",
+            "1",
+            "--direction",
+            "ltr",
+            "--out",
+            str(tmp_path),
             "--no-keep-png",
         ],
     )
@@ -123,7 +146,8 @@ def test_capture_no_keep_png(mock_run: MagicMock, tmp_path: Path) -> None:
 
 @patch("kindle_cap.cli.build_pdf")
 def test_rebuild_pdf_writes_to_parent_with_dir_name(
-    mock_build: MagicMock, tmp_path: Path,
+    mock_build: MagicMock,
+    tmp_path: Path,
 ) -> None:
     book = tmp_path / "my-book"
     book.mkdir()

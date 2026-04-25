@@ -1,4 +1,5 @@
 """Configuration data classes for kindle_cap."""
+
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path

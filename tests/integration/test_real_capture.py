@@ -5,6 +5,7 @@
   2. システム設定 > アクセシビリティ で iTerm2 等のターミナルを許可
   3. `uv run pytest -m live -v` を実行
 """
+
 from pathlib import Path
 
 import pytest

@@ -27,7 +27,13 @@ def _config(tmp_path: Path, **overrides) -> CaptureConfig:
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_three_pages_calls_each_step_correctly(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
 ):
     mock_geom.return_value = _GEOM
     run(_config(tmp_path, pages=3))
@@ -46,7 +52,13 @@ def test_run_three_pages_calls_each_step_correctly(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_dry_run_takes_one_shot_and_skips_pdf(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
 ):
     mock_geom.return_value = _GEOM
     run(_config(tmp_path), dry_run=True)
@@ -62,7 +74,13 @@ def test_run_dry_run_takes_one_shot_and_skips_pdf(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_dry_run_writes_to_dry_run_png(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
 ):
     mock_geom.return_value = _GEOM
     run(_config(tmp_path), dry_run=True)
@@ -77,7 +95,13 @@ def test_run_dry_run_writes_to_dry_run_png(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_keyboard_interrupt_keeps_partial_and_skips_pdf(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
 ):
     mock_geom.return_value = _GEOM
     mock_cap.side_effect = [None, KeyboardInterrupt(), None]
@@ -92,7 +116,13 @@ def test_run_keyboard_interrupt_keeps_partial_and_skips_pdf(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_deletes_existing_pngs_before_capture(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
 ):
     mock_geom.return_value = _GEOM
     out_dir = tmp_path / "bk"
@@ -110,7 +140,13 @@ def test_run_deletes_existing_pngs_before_capture(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_no_keep_png_removes_pngs_after_pdf(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
 ):
     mock_geom.return_value = _GEOM
 
@@ -131,7 +167,13 @@ def test_run_no_keep_png_removes_pngs_after_pdf(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_writes_pdf_to_out_root(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
 ):
     mock_geom.return_value = _GEOM
     run(_config(tmp_path, name="hello", pages=2))
@@ -146,7 +188,14 @@ def test_run_writes_pdf_to_out_root(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_prints_progress_for_each_page(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path, capsys,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
+    capsys,
 ):
     """長尺キャプチャの UX として、各ページごとに進捗を出すこと"""
     mock_geom.return_value = _GEOM
@@ -164,7 +213,14 @@ def test_run_prints_progress_for_each_page(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_progress_reflects_actual_page_count(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path, capsys,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
+    capsys,
 ):
     """N ページ指定なら 'N/N' まで含まれること（最終ページの進捗が抜けないこと）"""
     mock_geom.return_value = _GEOM
@@ -180,7 +236,14 @@ def test_run_progress_reflects_actual_page_count(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_dry_run_does_not_print_progress_count(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path, capsys,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
+    capsys,
 ):
     """dry-run はループしないので 1/N 形式の進捗は出ない"""
     mock_geom.return_value = _GEOM
@@ -216,7 +279,13 @@ def _capture_factory_with_termination(unique_pages: int):
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_auto_stop_halts_on_duplicate_consecutive_pages(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
 ):
     """3 ユニークページの後に同一ページ繰り返し → auto-stop で 3 ページのみ取る"""
     mock_geom.return_value = _GEOM
@@ -233,7 +302,13 @@ def test_run_auto_stop_halts_on_duplicate_consecutive_pages(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_auto_stop_off_keeps_full_pages(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
 ):
     """auto_stop=False（デフォルト）なら、重複ページがあっても指定 N ページ全部撮る"""
     mock_geom.return_value = _GEOM
@@ -250,7 +325,13 @@ def test_run_auto_stop_off_keeps_full_pages(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_auto_stop_removes_duplicate_png_from_disk(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
 ):
     """終端検出時に書いた重複 PNG ファイルは削除されること"""
     mock_geom.return_value = _GEOM
@@ -268,7 +349,13 @@ def test_run_auto_stop_removes_duplicate_png_from_disk(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_auto_stop_with_all_unique_pages_takes_full_count(
-    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path,
+    mock_pre,
+    mock_act,
+    mock_geom,
+    mock_cap,
+    mock_send,
+    mock_pdf,
+    tmp_path,
 ):
     """全ページがユニークなら、auto_stop でも N 枚撮る"""
     mock_geom.return_value = _GEOM

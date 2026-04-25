@@ -1,4 +1,5 @@
 """Typer-based CLI entry points for kindle_cap."""
+
 from pathlib import Path
 
 import typer
@@ -12,23 +13,31 @@ from .preflight import PreflightError
 def capture(
     pages: int = typer.Option(..., "--pages", help="撮影ページ数"),
     direction: Direction = typer.Option(
-        ..., "--direction", help="rtl=右綴じ、ltr=左綴じ",
+        ...,
+        "--direction",
+        help="rtl=右綴じ、ltr=左綴じ",
         case_sensitive=False,
     ),
     name: str = typer.Option(
-        None, "--name",
+        None,
+        "--name",
         help="書籍名（出力ディレクトリ名）。未指定時はプロンプトで聞きます",
     ),
     wait: float = typer.Option(1.0, "--wait", help="ページ送り後の待機秒"),
     out: Path = typer.Option(Path("output"), "--out", help="出力先ディレクトリ"),
     keep_png: bool = typer.Option(
-        True, "--keep-png/--no-keep-png", help="中間 PNG を保持",
+        True,
+        "--keep-png/--no-keep-png",
+        help="中間 PNG を保持",
     ),
     dry_run: bool = typer.Option(
-        False, "--dry-run", help="1 枚だけ撮影し PDF は作らない",
+        False,
+        "--dry-run",
+        help="1 枚だけ撮影し PDF は作らない",
     ),
     auto_stop: bool = typer.Option(
-        False, "--auto-stop",
+        False,
+        "--auto-stop",
         help="連続する 2 ページが同一なら書籍末尾と判断して停止",
     ),
 ) -> None:
@@ -48,12 +57,16 @@ def capture(
         orchestrator_run(config, dry_run=dry_run, auto_stop=auto_stop)
     except PreflightError as e:
         typer.echo(f"[エラー] {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 def rebuild_pdf(
     directory: Path = typer.Argument(
-        ..., exists=True, file_okay=False, dir_okay=True, readable=True,
+        ...,
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
         help="page_*.png を含むディレクトリ",
     ),
 ) -> None:
