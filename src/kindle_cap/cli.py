@@ -1,0 +1,68 @@
+"""Typer-based CLI entry points for kindle_cap."""
+from pathlib import Path
+
+import typer
+
+from .config import CaptureConfig, Direction
+from .orchestrator import run as orchestrator_run
+from .pdf import build_pdf
+from .preflight import PreflightError
+
+
+def capture(
+    pages: int = typer.Option(..., "--pages", help="撮影ページ数"),
+    direction: Direction = typer.Option(
+        ..., "--direction", help="rtl=右綴じ、ltr=左綴じ",
+        case_sensitive=False,
+    ),
+    name: str = typer.Option(
+        None, "--name",
+        help="書籍名（出力ディレクトリ名）。未指定時はプロンプトで聞きます",
+    ),
+    wait: float = typer.Option(1.0, "--wait", help="ページ送り後の待機秒"),
+    out: Path = typer.Option(Path("output"), "--out", help="出力先ディレクトリ"),
+    keep_png: bool = typer.Option(
+        True, "--keep-png/--no-keep-png", help="中間 PNG を保持",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="1 枚だけ撮影し PDF は作らない",
+    ),
+) -> None:
+    if name is None:
+        name = typer.prompt("書籍名 (出力ディレクトリ名)")
+    config = CaptureConfig(
+        name=name,
+        pages=pages,
+        direction=direction,
+        wait=wait,
+        out=out,
+        keep_png=keep_png,
+    )
+    try:
+        orchestrator_run(config, dry_run=dry_run)
+    except PreflightError as e:
+        typer.echo(f"[エラー] {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+def rebuild_pdf(
+    directory: Path = typer.Argument(
+        ..., exists=True, file_okay=False, dir_okay=True, readable=True,
+        help="page_*.png を含むディレクトリ",
+    ),
+) -> None:
+    pngs = sorted(directory.glob("page_*.png"))
+    if not pngs:
+        typer.echo(f"[エラー] {directory} に page_*.png が見つかりません", err=True)
+        raise typer.Exit(code=1)
+    out_path = directory.parent / f"{directory.name}.pdf"
+    build_pdf(pngs, out_path)
+    typer.echo(f"PDF を作成しました: {out_path}")
+
+
+def run_capture() -> None:
+    typer.run(capture)
+
+
+def run_rebuild_pdf() -> None:
+    typer.run(rebuild_pdf)
