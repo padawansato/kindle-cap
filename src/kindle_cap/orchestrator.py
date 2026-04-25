@@ -1,13 +1,11 @@
 """Orchestrate the capture loop, dry-run, and PDF assembly."""
 import hashlib
-from dataclasses import replace
 from pathlib import Path
 from time import sleep
 
 from .capture import capture_rect
 from .config import CaptureConfig
 from .keys import send_next_page
-from .library import click_at, close_book, compute_book_positions
 from .pdf import build_pdf
 from .preflight import preflight
 from .window import activate_kindle, get_window_geometry
@@ -28,54 +26,8 @@ def run(
     _capture_book(config, auto_stop=auto_stop)
 
 
-def run_library(
-    config: CaptureConfig,
-    max_books: int,
-    n_cols: int = 6,
-    book_open_wait: float = 2.0,
-    library_open_wait: float = 1.0,
-) -> None:
-    """ライブラリ画面から書籍を順次クリックして開き、それぞれ撮影する。
-
-    Args:
-        config: 撮影設定（name は連番に上書きされる）
-        max_books: ループする書籍数の上限
-        n_cols: ライブラリのグリッド列数
-        book_open_wait: 本を開いたあとの待機秒
-        library_open_wait: 本を閉じてライブラリに戻ったあとの待機秒
-    """
-    preflight()
-    config.out.mkdir(parents=True, exist_ok=True)
-
-    activate_kindle()
-    geom = get_window_geometry()
-    positions = compute_book_positions(geom, n_cols=n_cols)[:max_books]
-
-    print(f"=== ライブラリループ開始: {len(positions)} 冊 ===", flush=True)
-    try:
-        for i, (x, y) in enumerate(positions, 1):
-            book_name = f"book-{i:03d}"
-            print(
-                f"\n=== Book {i}/{len(positions)}: {book_name} (click {x},{y}) ===",
-                flush=True,
-            )
-            click_at(x, y)
-            sleep(book_open_wait)
-
-            single_config = replace(config, name=book_name)
-            _capture_book(single_config, auto_stop=True)
-
-            close_book()
-            sleep(library_open_wait)
-    except KeyboardInterrupt:
-        print("\n中断しました（ライブラリループ）", flush=True)
-        return
-
-    print(f"\n完了: {len(positions)} 冊", flush=True)
-
-
 def _capture_book(config: CaptureConfig, *, auto_stop: bool) -> None:
-    """preflight 抜きの単一書籍撮影。run / run_library から共有して使う。"""
+    """preflight 抜きの単一書籍撮影。"""
     out_dir = config.out / config.name
     out_dir.mkdir(parents=True, exist_ok=True)
     _purge_old_pages(out_dir)
