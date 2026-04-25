@@ -8,6 +8,7 @@ Kindle 不要 — 任意の画面領域を撮るだけなので Kindle が起動
   該当ディスプレイの内容が PNG として保存される
 - 例: 右に接続した外部 1920x1080 なら Geometry(1440, 0, 1920, 1080) で撮影可能
 """
+
 from pathlib import Path
 
 import pytest

@@ -1,4 +1,5 @@
 """preflight.py の live integration: 実 osascript で Kindle 状態を確認する。"""
+
 import pytest
 
 from kindle_cap.preflight import (

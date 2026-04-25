@@ -1,4 +1,5 @@
 """Activate the Kindle app and read its window geometry via AppleScript."""
+
 import subprocess
 
 from .config import Geometry

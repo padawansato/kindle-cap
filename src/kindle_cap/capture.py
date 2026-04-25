@@ -1,4 +1,5 @@
 """Capture a screen rectangle using macOS screencapture."""
+
 import subprocess
 from pathlib import Path
 

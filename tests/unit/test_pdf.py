@@ -67,10 +67,7 @@ def test_build_pdf_handles_single_png(tmp_path: Path) -> None:
 
 def test_build_pdf_handles_many_pngs(tmp_path: Path) -> None:
     """100 枚でも PDF 結合できること（性能境界）"""
-    pngs = [
-        _make_rgb_png(tmp_path / f"p_{i:03d}.png", size=(50, 50))
-        for i in range(100)
-    ]
+    pngs = [_make_rgb_png(tmp_path / f"p_{i:03d}.png", size=(50, 50)) for i in range(100)]
     out = tmp_path / "many.pdf"
     build_pdf(pngs, out)
     assert len(PdfReader(str(out)).pages) == 100
@@ -82,10 +79,7 @@ def test_build_pdf_handles_thousand_pngs(tmp_path: Path) -> None:
     現実装の `img2pdf.convert(...)` がメモリに全 PDF を載せると 1000 ページで
     数 GB に達する。ストリーム出力化することでメモリ消費を一定に保つ。
     """
-    pngs = [
-        _make_rgb_png(tmp_path / f"p_{i:04d}.png", size=(50, 50))
-        for i in range(1000)
-    ]
+    pngs = [_make_rgb_png(tmp_path / f"p_{i:04d}.png", size=(50, 50)) for i in range(1000)]
     out = tmp_path / "huge.pdf"
     build_pdf(pngs, out)
     assert len(PdfReader(str(out)).pages) == 1000
@@ -102,8 +96,9 @@ def test_build_pdf_streams_to_disk_without_loading_full_bytes_into_memory(
     検証は「途中で SIGINT 等で中断したとき、書きかけのファイルが一部だけ存在する」
     といった挙動の代わりに、`outputstream=` を使う実装かどうかをモックで判定する。
     """
-    import img2pdf
     from unittest.mock import patch
+
+    import img2pdf
 
     pngs = [_make_rgb_png(tmp_path / "x.png")]
     captured_kwargs: dict = {}

@@ -10,22 +10,24 @@ from kindle_cap.preflight import (
     preflight,
 )
 
-
 # ---------------------------------------------------------------------------
 # 純粋関数 _parse_count: "1\n" → 1
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("text,expected", [
-    ("0", 0),
-    ("1", 1),
-    ("10", 10),
-    ("999", 999),
-    ("0\n", 0),
-    ("1\n", 1),
-    (" 5 ", 5),
-    ("\n5\n", 5),
-])
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("0", 0),
+        ("1", 1),
+        ("10", 10),
+        ("999", 999),
+        ("0\n", 0),
+        ("1\n", 1),
+        (" 5 ", 5),
+        ("\n5\n", 5),
+    ],
+)
 def test_parse_count_extracts_integer(text: str, expected: int) -> None:
     assert _parse_count(text) == expected
 
@@ -41,25 +43,31 @@ def test_parse_count_rejects_non_integer(text: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("stderr", [
-    "error: -1719 (not authorized)",
-    "execution error: -1719",
-    "Some prefix -1719 some suffix",
-    "not allowed assistive access",
-    "Application is not allowed assistive access",
-])
+@pytest.mark.parametrize(
+    "stderr",
+    [
+        "error: -1719 (not authorized)",
+        "execution error: -1719",
+        "Some prefix -1719 some suffix",
+        "not allowed assistive access",
+        "Application is not allowed assistive access",
+    ],
+)
 def test_is_accessibility_error_recognizes_known_patterns(stderr: str) -> None:
     assert _is_accessibility_error(stderr) is True
 
 
-@pytest.mark.parametrize("stderr", [
-    "",
-    "Some other error",
-    "syntax error",
-    "process not found",
-    "-1718",  # 似た番号
-    "1719",  # マイナスなし
-])
+@pytest.mark.parametrize(
+    "stderr",
+    [
+        "",
+        "Some other error",
+        "syntax error",
+        "process not found",
+        "-1718",  # 似た番号
+        "1719",  # マイナスなし
+    ],
+)
 def test_is_accessibility_error_returns_false_for_other_errors(stderr: str) -> None:
     assert _is_accessibility_error(stderr) is False
 
@@ -122,9 +130,7 @@ def test_preflight_raises_when_accessibility_denied_with_dash_1719(
 def test_preflight_raises_when_accessibility_denied_with_text_pattern(
     mock_run: MagicMock,
 ) -> None:
-    err = subprocess.CalledProcessError(
-        1, "osascript", stderr="not allowed assistive access"
-    )
+    err = subprocess.CalledProcessError(1, "osascript", stderr="not allowed assistive access")
     mock_run.side_effect = _run_factory(["1\n", "1\n", err])
     with pytest.raises(PreflightError, match="アクセシビリティ"):
         preflight()

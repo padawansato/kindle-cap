@@ -1,4 +1,5 @@
 """Validate prerequisites before starting the capture loop."""
+
 import subprocess
 
 
@@ -7,16 +8,12 @@ class PreflightError(RuntimeError):
 
 
 _COUNT_KINDLE_PROC = (
-    'tell application "System Events" to '
-    '(count (every process whose name is "Kindle"))'
+    'tell application "System Events" to (count (every process whose name is "Kindle"))'
 )
 _COUNT_KINDLE_WINDOWS = (
-    'tell application "System Events" to '
-    'tell process "Kindle" to (count windows)'
+    'tell application "System Events" to tell process "Kindle" to (count windows)'
 )
-_ACCESSIBILITY_PROBE = (
-    'tell application "System Events" to get name of first process'
-)
+_ACCESSIBILITY_PROBE = 'tell application "System Events" to get name of first process'
 
 
 def _parse_count(stdout: str) -> int:
@@ -59,9 +56,7 @@ def _can_send_keystrokes() -> bool:
 
 def preflight() -> None:
     if not _is_kindle_running():
-        raise PreflightError(
-            "Kindle.app を起動してください（プロセスが見つかりません）"
-        )
+        raise PreflightError("Kindle.app を起動してください（プロセスが見つかりません）")
     if not _has_kindle_window():
         raise PreflightError("Kindle のウィンドウが開いていません")
     if not _can_send_keystrokes():

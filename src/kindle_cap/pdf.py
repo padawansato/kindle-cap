@@ -1,4 +1,5 @@
 """Combine PNG images into a single PDF using img2pdf (lossless)."""
+
 from pathlib import Path
 
 import img2pdf

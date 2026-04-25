@@ -4,7 +4,6 @@ import pytest
 
 from kindle_cap.config import CaptureConfig, Direction, Geometry
 
-
 # ---------------------------------------------------------------------------
 # Direction
 # ---------------------------------------------------------------------------

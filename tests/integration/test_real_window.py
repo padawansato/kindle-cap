@@ -8,6 +8,7 @@
 - `test_real_get_window_geometry_returns_valid_geometry` が pass することで
   外部ディスプレイの座標範囲（負値や大きな x 値）も正しく取得できていることを実証
 """
+
 import pytest
 
 from kindle_cap.config import Geometry

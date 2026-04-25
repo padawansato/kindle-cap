@@ -11,7 +11,6 @@ from kindle_cap.capture import (
 )
 from kindle_cap.config import Geometry
 
-
 # ---------------------------------------------------------------------------
 # 純粋関数 _build_screencapture_args: screencapture コマンド引数を組み立てる
 # ---------------------------------------------------------------------------
@@ -65,7 +64,12 @@ def test_build_args_handles_negative_origin(tmp_path: Path) -> None:
     ],
 )
 def test_build_args_supports_multi_display_origins(
-    tmp_path: Path, x: int, y: int, w: int, h: int, expected: str,
+    tmp_path: Path,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    expected: str,
 ) -> None:
     """マルチディスプレイ環境では Kindle が任意の仮想スクリーン座標にいる可能性。
     外部ディスプレイの座標 (負値・大値) でも screencapture 引数を正しく組み立てる。
@@ -148,15 +152,15 @@ def test_flatten_alpha_replaces_transparent_with_white_background(tmp_path: Path
 
 def _stub_screencapture_factory(out_path: Path, mode: str = "RGBA"):
     def side_effect(cmd, **kwargs):
-        Image.new(mode, (10, 10), "red" if mode == "RGB" else (255, 0, 0, 200)).save(
-            out_path
-        )
+        Image.new(mode, (10, 10), "red" if mode == "RGB" else (255, 0, 0, 200)).save(out_path)
+
     return side_effect
 
 
 @patch("kindle_cap.capture.subprocess.run")
 def test_capture_rect_writes_rgb_png_after_flatten(
-    mock_run: MagicMock, tmp_path: Path,
+    mock_run: MagicMock,
+    tmp_path: Path,
 ) -> None:
     out = tmp_path / "p.png"
     mock_run.side_effect = _stub_screencapture_factory(out, mode="RGBA")
@@ -166,7 +170,8 @@ def test_capture_rect_writes_rgb_png_after_flatten(
 
 @patch("kindle_cap.capture.subprocess.run")
 def test_capture_rect_passes_built_args_to_subprocess(
-    mock_run: MagicMock, tmp_path: Path,
+    mock_run: MagicMock,
+    tmp_path: Path,
 ) -> None:
     out = tmp_path / "p.png"
     mock_run.side_effect = _stub_screencapture_factory(out)
