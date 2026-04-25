@@ -1,13 +1,32 @@
 [project]
 name = "kindle-cap"
 version = "0.1.0"
-description = "Capture Kindle for Mac pages into a single PDF"
+description = "Capture Kindle for Mac pages into a single PDF (個人利用 CLI)"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
+authors = [
+    { name = "Takumi" },
+]
+keywords = ["kindle", "screenshot", "pdf", "macos", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics :: Capture :: Screen Capture",
+    "Topic :: Utilities",
+]
 dependencies = [
     "typer>=0.16",
     "img2pdf>=0.5",
     "pillow>=10.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/padawansato/kindle-calibre-tool"
+Issues = "https://github.com/padawansato/kindle-calibre-tool/issues"
 
 [project.scripts]
 kindle-cap = "kindle_cap.cli:run_capture"
