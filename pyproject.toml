@@ -37,6 +37,7 @@ dev = [
     "pytest>=8.0",
     "pypdf>=4.0",
     "ruff>=0.6",
+    "mypy>=1.10",
 ]
 
 [tool.pytest.ini_options]
@@ -72,6 +73,14 @@ quote-style = "double"
 [tool.ruff.lint.per-file-ignores]
 "src/kindle_cap/cli.py" = ["B008"]  # typer.Option / typer.Argument の標準パターン
 "tests/**/*.py" = ["B017"]  # frozen dataclass の不変性検証で bare Exception を使う
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+# サードパーティの型情報が無いライブラリは untyped 許容（漸進的に厳格化）
+[[tool.mypy.overrides]]
+module = ["img2pdf", "img2pdf.*"]
+ignore_missing_imports = true
 
 [build-system]
 requires = ["hatchling"]
