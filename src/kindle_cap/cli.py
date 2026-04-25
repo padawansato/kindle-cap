@@ -5,7 +5,6 @@ import typer
 
 from .config import CaptureConfig, Direction
 from .orchestrator import run as orchestrator_run
-from .orchestrator import run_library as orchestrator_run_library
 from .pdf import build_pdf
 from .preflight import PreflightError
 
@@ -32,34 +31,12 @@ def capture(
         False, "--auto-stop",
         help="連続する 2 ページが同一なら書籍末尾と判断して停止",
     ),
-    from_library: bool = typer.Option(
-        False, "--from-library",
-        help="ライブラリ画面から書籍を順次クリック→撮影→閉じる、を繰り返す",
-    ),
-    max_books: int = typer.Option(
-        10, "--max-books",
-        help="--from-library 時の上限冊数",
-    ),
-    n_cols: int = typer.Option(
-        6, "--n-cols",
-        help="--from-library 時のグリッド列数（Kindle のウィンドウサイズに依存）",
-    ),
-    book_open_wait: float = typer.Option(
-        2.0, "--book-open-wait",
-        help="--from-library 時、本を開いた後の待機秒",
-    ),
-    library_open_wait: float = typer.Option(
-        1.0, "--library-open-wait",
-        help="--from-library 時、本を閉じてライブラリに戻った後の待機秒",
-    ),
 ) -> None:
-    # library モードでは name は連番固定なのでプロンプトしない
-    if not from_library and name is None:
+    if name is None:
         name = typer.prompt("書籍名 (出力ディレクトリ名)")
 
-    # library モードでは name はダミー（_capture_book 内で連番に置き換わる）
     config = CaptureConfig(
-        name=(name or "library-loop"),
+        name=name,
         pages=pages,
         direction=direction,
         wait=wait,
@@ -68,16 +45,7 @@ def capture(
     )
 
     try:
-        if from_library:
-            orchestrator_run_library(
-                config,
-                max_books=max_books,
-                n_cols=n_cols,
-                book_open_wait=book_open_wait,
-                library_open_wait=library_open_wait,
-            )
-        else:
-            orchestrator_run(config, dry_run=dry_run, auto_stop=auto_stop)
+        orchestrator_run(config, dry_run=dry_run, auto_stop=auto_stop)
     except PreflightError as e:
         typer.echo(f"[エラー] {e}", err=True)
         raise typer.Exit(code=1)
