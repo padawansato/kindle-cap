@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from kindle_cap.config import CaptureConfig, Direction, Geometry
-from kindle_cap.orchestrator import run
+from kindle_cap.orchestrator import run, run_library
 
 _GEOM = Geometry(x=0, y=0, width=100, height=100)
 
@@ -282,3 +282,192 @@ def test_run_auto_stop_with_all_unique_pages_takes_full_count(
     mock_cap.side_effect = _all_unique
     run(_config(tmp_path, pages=5), auto_stop=True)
     assert mock_pdf.call_args[0][0].__len__() == 5
+
+
+# ---------------------------------------------------------------------------
+# run_library: ライブラリから本を順次開いて撮影
+# ---------------------------------------------------------------------------
+
+
+_LIBRARY_GEOM = Geometry(x=0, y=0, width=1440, height=869)
+
+
+@patch("kindle_cap.orchestrator.close_book")
+@patch("kindle_cap.orchestrator.click_at")
+@patch("kindle_cap.orchestrator.compute_book_positions")
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_library_clicks_each_position_in_order(
+    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf,
+    mock_compute, mock_click, mock_close, tmp_path,
+):
+    positions = [(100, 200), (300, 200), (500, 200)]
+    mock_compute.return_value = positions
+    mock_geom.return_value = _LIBRARY_GEOM
+
+    # auto-stop で 1 ページ目で停止するよう、capture が常に同じ内容を書く
+    counter = {"n": 0}
+
+    def _dup(geom, path):
+        counter["n"] += 1
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"same-content")  # 全部同一 → auto-stop 即発火
+
+    mock_cap.side_effect = _dup
+    run_library(_config(tmp_path), max_books=3, book_open_wait=0.0,
+                library_open_wait=0.0)
+
+    assert mock_click.call_count == 3
+    assert [call.args for call in mock_click.call_args_list] == [
+        (100, 200), (300, 200), (500, 200),
+    ]
+
+
+@patch("kindle_cap.orchestrator.close_book")
+@patch("kindle_cap.orchestrator.click_at")
+@patch("kindle_cap.orchestrator.compute_book_positions")
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_library_closes_book_after_each_capture(
+    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf,
+    mock_compute, mock_click, mock_close, tmp_path,
+):
+    mock_compute.return_value = [(100, 200), (300, 200)]
+    mock_geom.return_value = _LIBRARY_GEOM
+
+    def _dup(geom, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"same")
+
+    mock_cap.side_effect = _dup
+    run_library(_config(tmp_path), max_books=2, book_open_wait=0.0,
+                library_open_wait=0.0)
+    assert mock_close.call_count == 2
+
+
+@patch("kindle_cap.orchestrator.close_book")
+@patch("kindle_cap.orchestrator.click_at")
+@patch("kindle_cap.orchestrator.compute_book_positions")
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_library_max_books_caps_iteration(
+    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf,
+    mock_compute, mock_click, mock_close, tmp_path,
+):
+    """positions が 10 個あっても max_books=3 なら 3 冊で止まる"""
+    mock_compute.return_value = [(i * 100, 200) for i in range(10)]
+    mock_geom.return_value = _LIBRARY_GEOM
+
+    def _dup(geom, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"same")
+
+    mock_cap.side_effect = _dup
+    run_library(_config(tmp_path), max_books=3, book_open_wait=0.0,
+                library_open_wait=0.0)
+    assert mock_click.call_count == 3
+
+
+@patch("kindle_cap.orchestrator.close_book")
+@patch("kindle_cap.orchestrator.click_at")
+@patch("kindle_cap.orchestrator.compute_book_positions")
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_library_creates_separate_pdf_per_book(
+    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf,
+    mock_compute, mock_click, mock_close, tmp_path,
+):
+    mock_compute.return_value = [(100, 200), (300, 200)]
+    mock_geom.return_value = _LIBRARY_GEOM
+
+    def _dup(geom, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"same")
+
+    mock_cap.side_effect = _dup
+    run_library(_config(tmp_path), max_books=2, book_open_wait=0.0,
+                library_open_wait=0.0)
+
+    pdf_paths = [call.args[1] for call in mock_pdf.call_args_list]
+    # 各 PDF は book-001.pdf, book-002.pdf 形式で out_root に
+    pdf_names = sorted(p.name for p in pdf_paths)
+    assert pdf_names == ["book-001.pdf", "book-002.pdf"]
+
+
+@patch("kindle_cap.orchestrator.close_book")
+@patch("kindle_cap.orchestrator.click_at")
+@patch("kindle_cap.orchestrator.compute_book_positions")
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_library_runs_preflight_once(
+    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf,
+    mock_compute, mock_click, mock_close, tmp_path,
+):
+    """3 冊撮るのに preflight は 1 回だけ"""
+    mock_compute.return_value = [(100, 200), (300, 200), (500, 200)]
+    mock_geom.return_value = _LIBRARY_GEOM
+
+    def _dup(geom, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"same")
+
+    mock_cap.side_effect = _dup
+    run_library(_config(tmp_path), max_books=3, book_open_wait=0.0,
+                library_open_wait=0.0)
+    assert mock_pre.call_count == 1
+
+
+@patch("kindle_cap.orchestrator.close_book")
+@patch("kindle_cap.orchestrator.click_at")
+@patch("kindle_cap.orchestrator.compute_book_positions")
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_library_keyboard_interrupt_stops_loop(
+    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf,
+    mock_compute, mock_click, mock_close, tmp_path,
+):
+    mock_compute.return_value = [(i * 100, 200) for i in range(5)]
+    mock_geom.return_value = _LIBRARY_GEOM
+
+    # 撮影自体は同一内容で auto-stop 即発火させる
+    def _dup(geom, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"same")
+
+    mock_cap.side_effect = _dup
+
+    # 2 冊目の click で Ctrl-C
+    def _click_then_interrupt(x, y):
+        if mock_click.call_count == 2:
+            raise KeyboardInterrupt()
+
+    mock_click.side_effect = _click_then_interrupt
+
+    run_library(_config(tmp_path), max_books=5, book_open_wait=0.0,
+                library_open_wait=0.0)
+    # 5 冊全部はクリックされない（中断あり）
+    assert mock_click.call_count < 5
