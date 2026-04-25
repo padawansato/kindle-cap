@@ -19,6 +19,16 @@ _ACCESSIBILITY_PROBE = (
 )
 
 
+def _parse_count(stdout: str) -> int:
+    return int(stdout.strip())
+
+
+def _is_accessibility_error(stderr: str | None) -> bool:
+    if not stderr:
+        return False
+    return "-1719" in stderr or "not allowed assistive access" in stderr
+
+
 def _run_oscript(script: str) -> str:
     result = subprocess.run(
         ["osascript", "-e", script],
@@ -26,15 +36,15 @@ def _run_oscript(script: str) -> str:
         capture_output=True,
         text=True,
     )
-    return result.stdout.strip()
+    return result.stdout
 
 
 def _is_kindle_running() -> bool:
-    return int(_run_oscript(_COUNT_KINDLE_PROC)) > 0
+    return _parse_count(_run_oscript(_COUNT_KINDLE_PROC)) > 0
 
 
 def _has_kindle_window() -> bool:
-    return int(_run_oscript(_COUNT_KINDLE_WINDOWS)) > 0
+    return _parse_count(_run_oscript(_COUNT_KINDLE_WINDOWS)) > 0
 
 
 def _can_send_keystrokes() -> bool:
@@ -42,8 +52,7 @@ def _can_send_keystrokes() -> bool:
         _run_oscript(_ACCESSIBILITY_PROBE)
         return True
     except subprocess.CalledProcessError as e:
-        stderr = e.stderr or ""
-        if "-1719" in stderr or "not allowed assistive access" in stderr:
+        if _is_accessibility_error(e.stderr):
             return False
         raise
 

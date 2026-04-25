@@ -35,3 +35,7 @@ class CaptureConfig:
             raise ValueError("name must be non-empty")
         if "/" in self.name:
             raise ValueError("name must not contain '/'")
+        if "\x00" in self.name:
+            raise ValueError("name must not contain null bytes")
+        if self.name in (".", ".."):
+            raise ValueError("name must not be '.' or '..'")

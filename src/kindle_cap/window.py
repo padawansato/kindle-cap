@@ -13,6 +13,19 @@ _GEOMETRY_SCRIPT = """tell application "System Events" to tell process "Kindle"
 end tell"""
 
 
+def _parse_geometry_output(stdout: str) -> Geometry:
+    if stdout.strip() == "":
+        raise RuntimeError(f"unexpected geometry output: {stdout!r}")
+    parts = stdout.strip().split("\n")
+    if len(parts) != 4:
+        raise RuntimeError(f"unexpected geometry output: {stdout!r}")
+    try:
+        x, y, w, h = (int(p.strip()) for p in parts)
+    except ValueError as e:
+        raise RuntimeError(f"could not parse geometry output: {stdout!r}") from e
+    return Geometry(x=x, y=y, width=w, height=h)
+
+
 def activate_kindle() -> None:
     subprocess.run(
         ["osascript", "-e", _ACTIVATE_SCRIPT],
@@ -27,11 +40,4 @@ def get_window_geometry() -> Geometry:
         capture_output=True,
         text=True,
     )
-    parts = result.stdout.strip().split("\n")
-    if len(parts) != 4:
-        raise RuntimeError(f"unexpected osascript output: {result.stdout!r}")
-    try:
-        x, y, w, h = (int(p.strip()) for p in parts)
-    except ValueError as e:
-        raise RuntimeError(f"could not parse osascript output: {result.stdout!r}") from e
-    return Geometry(x=x, y=y, width=w, height=h)
+    return _parse_geometry_output(result.stdout)
