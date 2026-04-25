@@ -27,6 +27,10 @@ def capture(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="1 枚だけ撮影し PDF は作らない",
     ),
+    auto_stop: bool = typer.Option(
+        False, "--auto-stop",
+        help="連続する 2 ページが同一なら書籍末尾と判断して停止",
+    ),
 ) -> None:
     if name is None:
         name = typer.prompt("書籍名 (出力ディレクトリ名)")
@@ -39,7 +43,7 @@ def capture(
         keep_png=keep_png,
     )
     try:
-        orchestrator_run(config, dry_run=dry_run)
+        orchestrator_run(config, dry_run=dry_run, auto_stop=auto_stop)
     except PreflightError as e:
         typer.echo(f"[エラー] {e}", err=True)
         raise typer.Exit(code=1)

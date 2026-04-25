@@ -72,6 +72,39 @@ def test_capture_dry_run_passed_through(mock_run: MagicMock, tmp_path: Path) -> 
 
 
 @patch("kindle_cap.cli.orchestrator_run")
+def test_capture_auto_stop_passed_through(mock_run: MagicMock, tmp_path: Path) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        [
+            "--name", "x",
+            "--pages", "100",
+            "--direction", "rtl",
+            "--out", str(tmp_path),
+            "--auto-stop",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.kwargs.get("auto_stop") is True
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_auto_stop_default_false(mock_run: MagicMock, tmp_path: Path) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        [
+            "--name", "x",
+            "--pages", "5",
+            "--direction", "rtl",
+            "--out", str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.kwargs.get("auto_stop") is False
+
+
+@patch("kindle_cap.cli.orchestrator_run")
 def test_capture_no_keep_png(mock_run: MagicMock, tmp_path: Path) -> None:
     app = _make_app(capture)
     result = runner.invoke(

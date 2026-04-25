@@ -1,4 +1,5 @@
 """Orchestrate the capture loop, dry-run, and PDF assembly."""
+import hashlib
 from pathlib import Path
 from time import sleep
 
@@ -10,7 +11,11 @@ from .preflight import preflight
 from .window import activate_kindle, get_window_geometry
 
 
-def run(config: CaptureConfig, dry_run: bool = False) -> None:
+def run(
+    config: CaptureConfig,
+    dry_run: bool = False,
+    auto_stop: bool = False,
+) -> None:
     preflight()
     config.out.mkdir(parents=True, exist_ok=True)
 
@@ -23,6 +28,7 @@ def run(config: CaptureConfig, dry_run: bool = False) -> None:
     _purge_old_pages(out_dir)
 
     captured: list[Path] = []
+    last_hash: str | None = None
     try:
         for i in range(1, config.pages + 1):
             print(f"[{i}/{config.pages}] capturing page", flush=True)
@@ -30,6 +36,18 @@ def run(config: CaptureConfig, dry_run: bool = False) -> None:
             geom = get_window_geometry()
             png_path = out_dir / f"page_{i:03d}.png"
             capture_rect(geom, png_path)
+
+            if auto_stop:
+                current_hash = hashlib.md5(png_path.read_bytes()).hexdigest()
+                if current_hash == last_hash:
+                    png_path.unlink(missing_ok=True)
+                    print(
+                        f"終端を検出（前ページと同一）。{len(captured)} ページで停止",
+                        flush=True,
+                    )
+                    break
+                last_hash = current_hash
+
             captured.append(png_path)
             if i < config.pages:
                 send_next_page(config.direction)

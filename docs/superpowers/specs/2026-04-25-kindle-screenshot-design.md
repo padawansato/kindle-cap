@@ -116,6 +116,7 @@ uv run kindle-cap [OPTIONS]
   --out PATH                  出力先ディレクトリ [デフォルト: ./output]
   --keep-png / --no-keep-png  中間 PNG を保持 [デフォルト: --keep-png]
   --dry-run                   1 枚だけ撮影し PDF は作らない（位置確認用）
+  --auto-stop                 連続する 2 ページが同一なら書籍末尾と判断して停止
   --help                      ヘルプ
 ```
 
@@ -186,6 +187,17 @@ for i in range(1, pages + 1):
 1. preflight 通過後、1 枚だけ `dry_run.png` として撮影
 2. ウィンドウ位置とサイズを stdout に表示
 3. PDF は作らない、PNG は `out_root / dry_run.png`
+
+### 6.6 --auto-stop（書籍末尾の自動検出）
+
+1. 各ページ撮影後、PNG ファイルの md5 ハッシュを計算
+2. 直前のページのハッシュと一致したら「右矢印を送ってもページが変わらない＝書籍末尾」と判断
+3. 重複した PNG ファイルを削除し、ループを break
+4. PDF はそれまでの captured ページから生成
+
+これにより、リフロー型でフォントを大きくしてページ数が増えた書籍など、
+事前にページ数が読めない場合でも `--pages 600 --auto-stop` のように
+余裕を持って指定すれば、自動的に末尾で停止できる。
 
 ## 7. データモデル
 
