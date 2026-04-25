@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "typer>=0.16",
     "img2pdf>=0.5",
+    "pillow>=10.0",
 ]
 
 [project.scripts]
@@ -16,7 +17,6 @@ kindle-cap-pdf = "kindle_cap.cli:run_rebuild_pdf"
 dev = [
     "pytest>=8.0",
     "pypdf>=4.0",
-    "pillow>=10.0",
 ]
 
 [tool.pytest.ini_options]
