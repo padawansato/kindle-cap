@@ -123,11 +123,21 @@ osascript / screencapture
 ## 開発
 
 ```bash
+# 初回セットアップ
+uv sync
+uv run pre-commit install   # commit 前に ruff / mypy / 各種チェックを自動実行
+
 # ユニットテスト
 uv run pytest
 
 # Kindle 起動済みでの実機テスト（live マーカー）
 uv run pytest -m live
+
+# 手動で全チェック
+uv run ruff check src/ tests/
+uv run ruff format --check src/ tests/
+uv run mypy src/kindle_cap/
+uv run pre-commit run --all-files   # 上記をまとめて実行
 ```
 
 ## ライセンス
