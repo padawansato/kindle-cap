@@ -137,3 +137,53 @@ def test_run_writes_pdf_to_out_root(
     run(_config(tmp_path, name="hello", pages=2))
     pdf_path = mock_pdf.call_args[0][1]
     assert pdf_path == tmp_path / "hello.pdf"
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_prints_progress_for_each_page(
+    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path, capsys,
+):
+    """長尺キャプチャの UX として、各ページごとに進捗を出すこと"""
+    mock_geom.return_value = _GEOM
+    run(_config(tmp_path, pages=3))
+    out = capsys.readouterr().out
+    assert "1/3" in out
+    assert "2/3" in out
+    assert "3/3" in out
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_progress_reflects_actual_page_count(
+    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path, capsys,
+):
+    """N ページ指定なら 'N/N' まで含まれること（最終ページの進捗が抜けないこと）"""
+    mock_geom.return_value = _GEOM
+    run(_config(tmp_path, pages=10))
+    out = capsys.readouterr().out
+    assert "10/10" in out
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_dry_run_does_not_print_progress_count(
+    mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf, tmp_path, capsys,
+):
+    """dry-run はループしないので 1/N 形式の進捗は出ない"""
+    mock_geom.return_value = _GEOM
+    run(_config(tmp_path, pages=1), dry_run=True)
+    out = capsys.readouterr().out
+    assert "1/1" not in out

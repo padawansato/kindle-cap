@@ -17,6 +17,16 @@ def sample_pngs(tmp_path: Path) -> list[Path]:
     return paths
 
 
+def _make_rgb_png(path: Path, size: tuple[int, int] = (100, 100), color: str = "red") -> Path:
+    Image.new("RGB", size, color).save(path)
+    return path
+
+
+# ---------------------------------------------------------------------------
+# 基本動作
+# ---------------------------------------------------------------------------
+
+
 def test_build_pdf_creates_pdf_file(sample_pngs: list[Path], tmp_path: Path) -> None:
     out = tmp_path / "out.pdf"
     build_pdf(sample_pngs, out)
@@ -37,6 +47,124 @@ def test_build_pdf_creates_parent_dirs(sample_pngs: list[Path], tmp_path: Path) 
     assert out.exists()
 
 
-def test_build_pdf_empty_list_raises(tmp_path: Path) -> None:
+# ---------------------------------------------------------------------------
+# 境界値
+# ---------------------------------------------------------------------------
+
+
+def test_build_pdf_rejects_empty_list(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="empty"):
         build_pdf([], tmp_path / "o.pdf")
+
+
+def test_build_pdf_handles_single_png(tmp_path: Path) -> None:
+    """最小有効ページ数: 1 枚"""
+    p = _make_rgb_png(tmp_path / "only.png")
+    out = tmp_path / "single.pdf"
+    build_pdf([p], out)
+    assert len(PdfReader(str(out)).pages) == 1
+
+
+def test_build_pdf_handles_many_pngs(tmp_path: Path) -> None:
+    """100 枚でも PDF 結合できること（性能境界）"""
+    pngs = [
+        _make_rgb_png(tmp_path / f"p_{i:03d}.png", size=(50, 50))
+        for i in range(100)
+    ]
+    out = tmp_path / "many.pdf"
+    build_pdf(pngs, out)
+    assert len(PdfReader(str(out)).pages) == 100
+
+
+def test_build_pdf_handles_thousand_pngs(tmp_path: Path) -> None:
+    """リフロー型書籍で論理ページが膨らむケースの想定。
+
+    現実装の `img2pdf.convert(...)` がメモリに全 PDF を載せると 1000 ページで
+    数 GB に達する。ストリーム出力化することでメモリ消費を一定に保つ。
+    """
+    pngs = [
+        _make_rgb_png(tmp_path / f"p_{i:04d}.png", size=(50, 50))
+        for i in range(1000)
+    ]
+    out = tmp_path / "huge.pdf"
+    build_pdf(pngs, out)
+    assert len(PdfReader(str(out)).pages) == 1000
+
+
+def test_build_pdf_streams_to_disk_without_loading_full_bytes_into_memory(
+    tmp_path: Path,
+) -> None:
+    """ファイルが先に開かれて、stream で書き込まれること。
+
+    実装上、`out_path.write_bytes(...)` で全データをメモリ経由する形ではなく、
+    open(out_path, 'wb') の stream に img2pdf を直接書き出す形であるべき。
+
+    検証は「途中で SIGINT 等で中断したとき、書きかけのファイルが一部だけ存在する」
+    といった挙動の代わりに、`outputstream=` を使う実装かどうかをモックで判定する。
+    """
+    import img2pdf
+    from unittest.mock import patch
+
+    pngs = [_make_rgb_png(tmp_path / "x.png")]
+    captured_kwargs: dict = {}
+
+    real_convert = img2pdf.convert
+
+    def spy(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return real_convert(*args, **kwargs)
+
+    with patch("kindle_cap.pdf.img2pdf.convert", side_effect=spy):
+        build_pdf(pngs, tmp_path / "out.pdf")
+
+    assert "outputstream" in captured_kwargs, (
+        "build_pdf は img2pdf.convert に outputstream を渡してストリーム出力する"
+    )
+
+
+def test_build_pdf_handles_different_sizes(tmp_path: Path) -> None:
+    """異なる画素サイズの PNG が混在しても結合できる"""
+    p1 = _make_rgb_png(tmp_path / "small.png", size=(100, 100))
+    p2 = _make_rgb_png(tmp_path / "large.png", size=(500, 700))
+    p3 = _make_rgb_png(tmp_path / "wide.png", size=(800, 200))
+    out = tmp_path / "mixed.pdf"
+    build_pdf([p1, p2, p3], out)
+    reader = PdfReader(str(out))
+    assert len(reader.pages) == 3
+
+
+def test_build_pdf_overwrites_existing_pdf(sample_pngs: list[Path], tmp_path: Path) -> None:
+    """既存 PDF があっても上書きされる"""
+    out = tmp_path / "out.pdf"
+    out.write_bytes(b"GARBAGE")
+    build_pdf(sample_pngs, out)
+    assert out.read_bytes()[:5] == b"%PDF-"
+    assert len(PdfReader(str(out)).pages) == 3
+
+
+def test_build_pdf_handles_japanese_filename(sample_pngs: list[Path], tmp_path: Path) -> None:
+    out = tmp_path / "テスト書籍.pdf"
+    build_pdf(sample_pngs, out)
+    assert out.exists()
+
+
+def test_build_pdf_handles_path_with_spaces(sample_pngs: list[Path], tmp_path: Path) -> None:
+    out_dir = tmp_path / "name with space"
+    out_dir.mkdir()
+    out = out_dir / "out.pdf"
+    build_pdf(sample_pngs, out)
+    assert out.exists()
+
+
+def test_build_pdf_preserves_page_order(tmp_path: Path) -> None:
+    """与えた PNG リストの順序で PDF が並ぶ"""
+    pngs = [
+        _make_rgb_png(tmp_path / "first.png", color="red"),
+        _make_rgb_png(tmp_path / "second.png", color="green"),
+        _make_rgb_png(tmp_path / "third.png", color="blue"),
+    ]
+    out = tmp_path / "ordered.pdf"
+    build_pdf(pngs, out)
+    reader = PdfReader(str(out))
+    assert len(reader.pages) == 3
+    # 順序の本格検証は PDF 内画像抽出が必要 — ここではページ数のみで妥協

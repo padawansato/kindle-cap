@@ -25,6 +25,7 @@ def run(config: CaptureConfig, dry_run: bool = False) -> None:
     captured: list[Path] = []
     try:
         for i in range(1, config.pages + 1):
+            print(f"[{i}/{config.pages}] capturing page", flush=True)
             activate_kindle()
             geom = get_window_geometry()
             png_path = out_dir / f"page_{i:03d}.png"
