@@ -1,8 +1,11 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from kindle_cap.config import CaptureConfig, Direction, Geometry
 from kindle_cap.orchestrator import _capture_book, _image_hash, run
+from kindle_cap.preflight import PreflightError
 
 _GEOM = Geometry(x=0, y=0, width=100, height=100)
 
@@ -506,3 +509,125 @@ def test_capture_book_default_start_index_unchanged_behavior(
     assert mock_cap.call_count == 3
     assert mock_send.call_count == 2  # 最終ページ後は送らない
     assert mock_pdf.call_args[0][0].__len__() == 3
+
+
+# ---------------------------------------------------------------------------
+# run() に auto_direction 統合
+# ---------------------------------------------------------------------------
+
+
+def _make_detect_stub(direction: Direction, num_pngs: int):
+    """detect_direction の挙動を模倣: out_dir に試写 PNG を書き出してから返す。"""
+
+    def _stub(*, out_dir, **_kwargs):
+        pngs = []
+        for i in range(1, num_pngs + 1):
+            p = out_dir / f"page_{i:03d}.png"
+            p.write_bytes(f"probe-{i}".encode())
+            pngs.append(p)
+        return (direction, pngs)
+
+    return _stub
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+@patch("kindle_cap.orchestrator.detect_direction")
+def test_run_auto_direction_resolves_direction_via_detect(
+    mock_detect, mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf,
+    tmp_path: Path,
+) -> None:
+    """auto_direction=True で detect_direction が呼ばれ、確定した direction で本撮影"""
+    mock_geom.return_value = _GEOM
+    mock_detect.side_effect = _make_detect_stub(Direction.LTR, 3)
+    mock_cap.side_effect = lambda g, p: p.write_bytes(b"new")
+    config = _config(tmp_path, pages=5, direction=None)
+    run(config, auto_direction=True)
+    assert mock_detect.called
+    # send_next_page は LTR で呼ばれる（試写流用後の本番ループ送信のみ検査）
+    assert all(c.args[0] is Direction.LTR for c in mock_send.call_args_list)
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+@patch("kindle_cap.orchestrator.detect_direction")
+def test_run_auto_direction_reuses_probe_pngs_for_first_three_pages(
+    mock_detect, mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf,
+    tmp_path: Path,
+) -> None:
+    """detect が 3 枚返したら、capture_rect は (pages - 3) 回しか呼ばれない"""
+    mock_geom.return_value = _GEOM
+    mock_detect.side_effect = _make_detect_stub(Direction.RTL, 3)
+    mock_cap.side_effect = lambda g, p: p.write_bytes(b"new")
+    config = _config(tmp_path, pages=5, direction=None)
+    run(config, auto_direction=True)
+    assert mock_cap.call_count == 2  # page_004 + page_005
+    # PDF には 5 枚（試写 3 + 新規 2）
+    assert mock_pdf.call_args[0][0].__len__() == 5
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+@patch("kindle_cap.orchestrator.detect_direction")
+def test_run_auto_direction_with_fallback_starts_at_page_001(
+    mock_detect, mock_pre, mock_act, mock_geom, mock_cap, mock_send, mock_pdf,
+    tmp_path: Path,
+) -> None:
+    """detect が空リストを返した場合、_capture_book は通常通り start_index=1 から"""
+    mock_geom.return_value = _GEOM
+    mock_detect.return_value = (Direction.LTR, [])
+    mock_cap.side_effect = lambda g, p: p.write_bytes(f"u-{p.name}".encode())
+    config = _config(tmp_path, pages=3, direction=None)
+    run(config, auto_direction=True)
+    assert mock_cap.call_count == 3
+    assert mock_pdf.call_args[0][0].__len__() == 3
+
+
+@patch("kindle_cap.orchestrator.preflight")
+@patch("kindle_cap.orchestrator.detect_direction")
+def test_run_auto_direction_propagates_preflight_error(
+    mock_detect, mock_pre, tmp_path: Path,
+) -> None:
+    """detect_direction が PreflightError を上げたら run も伝播"""
+    mock_detect.side_effect = PreflightError("両方向ともページが進みません")
+    config = _config(tmp_path, pages=5, direction=None)
+    with pytest.raises(PreflightError):
+        run(config, auto_direction=True)
+
+
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_with_direction_none_and_auto_direction_false_raises(
+    mock_pre, tmp_path: Path,
+) -> None:
+    """direction=None かつ auto_direction=False は ValueError"""
+    config = _config(tmp_path, pages=5, direction=None)
+    with pytest.raises(ValueError, match="direction"):
+        run(config, auto_direction=False)
+
+
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+@patch("kindle_cap.orchestrator.detect_direction")
+def test_run_dry_run_with_auto_direction_skips_detect(
+    mock_detect, mock_pre, mock_act, mock_geom, mock_cap, tmp_path: Path,
+) -> None:
+    """dry_run=True のとき auto_direction を渡しても detect_direction は呼ばれない"""
+    mock_geom.return_value = _GEOM
+    config = _config(tmp_path, pages=1, direction=None)
+    run(config, dry_run=True, auto_direction=True)
+    assert not mock_detect.called
+    assert mock_cap.call_count == 1  # _run_dry の 1 枚撮影のみ

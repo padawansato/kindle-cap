@@ -1,15 +1,16 @@
 """Orchestrate the capture loop, dry-run, and PDF assembly."""
 
 import contextlib
+import dataclasses
 import hashlib
 from pathlib import Path
 from time import sleep
 
 from .capture import capture_rect
-from .config import CaptureConfig
+from .config import CaptureConfig, Direction
 from .keys import send_next_page
 from .pdf import build_pdf
-from .preflight import preflight
+from .preflight import detect_direction, preflight
 from .window import activate_kindle, get_window_geometry
 
 
@@ -17,6 +18,7 @@ def run(
     config: CaptureConfig,
     dry_run: bool = False,
     auto_stop: bool = False,
+    auto_direction: bool = False,
 ) -> None:
     preflight()
     config.out.mkdir(parents=True, exist_ok=True)
@@ -25,6 +27,38 @@ def run(
         _run_dry(config)
         return
 
+    if auto_direction:
+        out_dir = config.out / config.name
+        out_dir.mkdir(parents=True, exist_ok=True)
+        _purge_old_pages(out_dir)
+
+        resolved_direction, probe_pngs = detect_direction(
+            out_dir=out_dir,
+            geom_provider=get_window_geometry,
+            activator=activate_kindle,
+            capturer=capture_rect,
+            sender=send_next_page,
+            sleeper=sleep,
+            wait=config.wait,
+        )
+        resolved_config = dataclasses.replace(config, direction=resolved_direction)
+
+        if probe_pngs:
+            seed_hashes = [_image_hash(p) for p in probe_pngs]
+            _capture_book(
+                resolved_config,
+                auto_stop=auto_stop,
+                start_index=len(probe_pngs) + 1,
+                seed_hashes=seed_hashes,
+            )
+        else:
+            _capture_book(resolved_config, auto_stop=auto_stop)
+        return
+
+    if config.direction is None:
+        raise ValueError(
+            "direction を指定してください（または auto_direction=True を使用）"
+        )
     _capture_book(config, auto_stop=auto_stop)
 
 
