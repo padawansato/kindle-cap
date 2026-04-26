@@ -7,7 +7,7 @@ from pathlib import Path
 from time import sleep
 
 from .capture import capture_rect
-from .config import CaptureConfig, Direction
+from .config import CaptureConfig
 from .keys import send_next_page
 from .pdf import build_pdf
 from .preflight import detect_direction, preflight
@@ -56,9 +56,7 @@ def run(
         return
 
     if config.direction is None:
-        raise ValueError(
-            "direction を指定してください（または auto_direction=True を使用）"
-        )
+        raise ValueError("direction を指定してください（または auto_direction=True を使用）")
     _capture_book(config, auto_stop=auto_stop)
 
 

@@ -289,7 +289,7 @@ def test_detect_direction_error_message_mentions_focus_or_one_page(
 ) -> None:
     """エラーメッセージは原因を示唆する文言を含む"""
     cap = _capturer_writing_seq([b"x", b"x", b"x", b"x", b"x"])
-    with pytest.raises(PreflightError, match="フォーカス|1 ページ"):
+    with pytest.raises(PreflightError, match=r"フォーカス|1 ページ"):
         detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
 
 

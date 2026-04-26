@@ -178,7 +178,8 @@ def test_rebuild_pdf_missing_dir_exits_nonzero(tmp_path: Path) -> None:
 
 @patch("kindle_cap.cli.orchestrator_run")
 def test_capture_auto_direction_routes_to_run_with_flag(
-    mock_run: MagicMock, tmp_path: Path,
+    mock_run: MagicMock,
+    tmp_path: Path,
 ) -> None:
     """--auto-direction 単体指定で auto_direction=True、direction は None"""
     app = _make_app(capture)
@@ -199,9 +200,15 @@ def test_capture_direction_and_auto_direction_conflict_exits_nonzero(
     result = runner.invoke(
         app,
         [
-            "--name", "x", "--pages", "5",
-            "--direction", "rtl", "--auto-direction",
-            "--out", str(tmp_path),
+            "--name",
+            "x",
+            "--pages",
+            "5",
+            "--direction",
+            "rtl",
+            "--auto-direction",
+            "--out",
+            str(tmp_path),
         ],
     )
     assert result.exit_code != 0
@@ -214,7 +221,8 @@ def test_capture_neither_direction_nor_auto_direction_exits_nonzero(
     """--direction も --auto-direction も未指定はエラー"""
     app = _make_app(capture)
     result = runner.invoke(
-        app, ["--name", "x", "--pages", "5", "--out", str(tmp_path)],
+        app,
+        ["--name", "x", "--pages", "5", "--out", str(tmp_path)],
     )
     assert result.exit_code != 0
     assert "いずれか" in result.output
@@ -222,7 +230,8 @@ def test_capture_neither_direction_nor_auto_direction_exits_nonzero(
 
 @patch("kindle_cap.cli.orchestrator_run")
 def test_capture_existing_direction_still_works(
-    mock_run: MagicMock, tmp_path: Path,
+    mock_run: MagicMock,
+    tmp_path: Path,
 ) -> None:
     """後方互換: --direction rtl 単体で従来通り動く"""
     app = _make_app(capture)
@@ -237,16 +246,22 @@ def test_capture_existing_direction_still_works(
 
 @patch("kindle_cap.cli.orchestrator_run")
 def test_capture_auto_direction_combined_with_auto_stop(
-    mock_run: MagicMock, tmp_path: Path,
+    mock_run: MagicMock,
+    tmp_path: Path,
 ) -> None:
     """--auto-direction と --auto-stop を組み合わせて指定できる"""
     app = _make_app(capture)
     result = runner.invoke(
         app,
         [
-            "--name", "x", "--pages", "100",
-            "--auto-direction", "--auto-stop",
-            "--out", str(tmp_path),
+            "--name",
+            "x",
+            "--pages",
+            "100",
+            "--auto-direction",
+            "--auto-stop",
+            "--out",
+            str(tmp_path),
         ],
     )
     assert result.exit_code == 0, result.output
