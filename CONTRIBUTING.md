@@ -5,8 +5,8 @@
 ## 開発環境のセットアップ
 
 ```bash
-git clone https://github.com/padawansato/kindle-calibre-tool.git
-cd kindle-calibre-tool
+git clone https://github.com/padawansato/kindle-cap.git
+cd kindle-cap
 uv sync
 uv run pre-commit install
 ```

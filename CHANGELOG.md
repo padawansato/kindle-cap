@@ -29,5 +29,5 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-calibre-tool/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/padawansato/kindle-calibre-tool/releases/tag/v0.1.0
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/padawansato/kindle-cap/releases/tag/v0.1.0
