@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from kindle_cap.config import CaptureConfig, Direction, Geometry
-from kindle_cap.orchestrator import run
+from kindle_cap.orchestrator import _image_hash, run
 
 _GEOM = Geometry(x=0, y=0, width=100, height=100)
 
@@ -369,3 +369,17 @@ def test_run_auto_stop_with_all_unique_pages_takes_full_count(
     mock_cap.side_effect = _all_unique
     run(_config(tmp_path, pages=5), auto_stop=True)
     assert mock_pdf.call_args[0][0].__len__() == 5
+
+
+def test_image_hash_returns_md5_hex(tmp_path: Path) -> None:
+    p = tmp_path / "f.bin"
+    p.write_bytes(b"hello")
+    assert _image_hash(p) == "5d41402abc4b2a76b9719d911017c592"
+
+
+def test_image_hash_changes_on_byte_change(tmp_path: Path) -> None:
+    p = tmp_path / "f.bin"
+    p.write_bytes(b"hello")
+    h1 = _image_hash(p)
+    p.write_bytes(b"hello!")
+    assert h1 != _image_hash(p)

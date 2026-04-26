@@ -28,6 +28,10 @@ def run(
     _capture_book(config, auto_stop=auto_stop)
 
 
+def _image_hash(path: Path) -> str:
+    return hashlib.md5(path.read_bytes()).hexdigest()
+
+
 def _capture_book(config: CaptureConfig, *, auto_stop: bool) -> None:
     """preflight 抜きの単一書籍撮影。"""
     out_dir = config.out / config.name
@@ -45,7 +49,7 @@ def _capture_book(config: CaptureConfig, *, auto_stop: bool) -> None:
             capture_rect(geom, png_path)
 
             if auto_stop:
-                current_hash = hashlib.md5(png_path.read_bytes()).hexdigest()
+                current_hash = _image_hash(png_path)
                 if current_hash == last_hash:
                     png_path.unlink(missing_ok=True)
                     print(
