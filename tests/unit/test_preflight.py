@@ -273,3 +273,29 @@ def test_detect_direction_unlinks_probe_pngs_on_fallback(tmp_path: Path) -> None
     assert not (tmp_path / "page_003.png").exists()
     assert not (tmp_path / "_origin.png").exists()
     assert not (tmp_path / "_verify.png").exists()
+
+
+def test_detect_direction_raises_preflight_error_when_both_directions_unresponsive(
+    tmp_path: Path,
+) -> None:
+    """両方向とも無反応 → PreflightError"""
+    cap = _capturer_writing_seq([b"x", b"x", b"x", b"x", b"x"])
+    with pytest.raises(PreflightError):
+        detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
+
+
+def test_detect_direction_error_message_mentions_focus_or_one_page(
+    tmp_path: Path,
+) -> None:
+    """エラーメッセージは原因を示唆する文言を含む"""
+    cap = _capturer_writing_seq([b"x", b"x", b"x", b"x", b"x"])
+    with pytest.raises(PreflightError, match="フォーカス|1 ページ"):
+        detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
+
+
+def test_detect_direction_error_path_leaves_no_files(tmp_path: Path) -> None:
+    """エラー時も out_dir に余計なファイルを残さない"""
+    cap = _capturer_writing_seq([b"x", b"x", b"x", b"x", b"x"])
+    with pytest.raises(PreflightError):
+        detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
+    assert list(tmp_path.glob("*.png")) == []
