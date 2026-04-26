@@ -11,15 +11,15 @@ labels: bug
 
 ## 再現手順
 
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ## 環境
 
-- macOS バージョン: 
+- macOS バージョン:
 - Python バージョン: `python --version`
-- Kindle.app バージョン: 
+- Kindle.app バージョン:
 - ディスプレイ構成: シングル / マルチ
 - ターミナル: iTerm2 / 標準 / その他
 
