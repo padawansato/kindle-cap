@@ -192,3 +192,9 @@ def test_config_equality_by_value() -> None:
     c1 = CaptureConfig(**_valid_config_kwargs())
     c2 = CaptureConfig(**_valid_config_kwargs())
     assert c1 == c2
+
+
+def test_config_direction_none_allowed() -> None:
+    """auto-direction 経路で direction が確定するまで None を保持できる。"""
+    c = CaptureConfig(**_valid_config_kwargs(direction=None))
+    assert c.direction is None

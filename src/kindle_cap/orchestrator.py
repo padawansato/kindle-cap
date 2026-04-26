@@ -33,7 +33,8 @@ def _image_hash(path: Path) -> str:
 
 
 def _capture_book(config: CaptureConfig, *, auto_stop: bool) -> None:
-    """preflight 抜きの単一書籍撮影。"""
+    """preflight 抜きの単一書籍撮影。direction は確定済みで呼ばれる前提。"""
+    assert config.direction is not None, "_capture_book requires resolved direction"
     out_dir = config.out / config.name
     out_dir.mkdir(parents=True, exist_ok=True)
     _purge_old_pages(out_dir)
