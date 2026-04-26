@@ -64,7 +64,15 @@ uv sync
 
 ```bash
 # 1. Kindle.app で書籍を開き、表紙ページを表示する（Cmd+G で先頭ジャンプも可）
-# 2. 撮影実行
+# 2. 撮影実行（direction を自動判定する場合）
+uv run kindle-cap \
+  --name my-book \
+  --pages 600 \
+  --auto-direction \
+  --auto-stop \
+  --wait 1.5
+
+# 明示指定（rtl/ltr が分かっている場合）
 uv run kindle-cap \
   --name my-book \
   --pages 600 \
@@ -88,7 +96,8 @@ output/my-book.pdf
 | オプション | 必須 | デフォルト | 説明 |
 |---|---|---|---|
 | `--pages N` | ✓ | — | 撮影ページ数の上限 |
-| `--direction rtl\|ltr` | ✓ | — | `rtl`=右綴じ（右矢印で次ページ）、`ltr`=左綴じ（左矢印で次ページ） |
+| `--direction rtl\|ltr` | ※ | — | `rtl`=右綴じ（右矢印で次ページ）、`ltr`=左綴じ（左矢印で次ページ） |
+| `--auto-direction` | ※ | off | 表紙起点で direction を試写判定。試写は本番に流用（重複撮影なし） |
 | `--name NAME` | | （対話プロンプト） | 出力ディレクトリ名 |
 | `--wait SEC` | | `1.0` | ページ送り後の待機秒（重い書籍は `1.5` 推奨） |
 | `--out PATH` | | `./output` | 出力先 |
@@ -96,8 +105,11 @@ output/my-book.pdf
 | `--dry-run` | | off | 1 枚だけ撮って位置確認用に保存（PDF は作らない） |
 | `--auto-stop` | | off | 連続する 2 ページが同一なら書籍末尾と判断して停止 |
 
+※ `--direction` または `--auto-direction` のいずれかが必須（同時指定はエラー）
+
 > [!IMPORTANT]
-> **direction についての注意**: Kindle for Mac 上の `direction` は紙の綴じ方向と必ずしも一致しない。リフロー型の和書（縦書き）でも左矢印で次ページ（`ltr`）になるケースがある。`--dry-run` で 1 枚撮影 → 矢印キーを 1 回手動で押してページが進むか確認、で判定するのを推奨。
+> **direction についての注意**: Kindle for Mac 上の `direction` は紙の綴じ方向と必ずしも一致しない。リフロー型の和書（縦書き）でも左矢印で次ページ（`ltr`）になるケースがある。
+> **推奨**: `--auto-direction` で表紙起点の試写による自動判定を使う（`--dry-run` で当てっこする手間が消える）。明示指定したい場合は従来通り `--direction rtl|ltr` も使える。
 
 ### 既存 PNG から PDF だけ再生成
 

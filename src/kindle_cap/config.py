@@ -22,7 +22,7 @@ class Geometry:
 class CaptureConfig:
     name: str
     pages: int
-    direction: Direction
+    direction: Direction | None
     wait: float
     out: Path
     keep_png: bool

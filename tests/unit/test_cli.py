@@ -5,6 +5,7 @@ import typer
 from typer.testing import CliRunner
 
 from kindle_cap.cli import capture, rebuild_pdf
+from kindle_cap.config import Direction
 
 runner = CliRunner()
 
@@ -168,3 +169,101 @@ def test_rebuild_pdf_missing_dir_exits_nonzero(tmp_path: Path) -> None:
     app = _make_app(rebuild_pdf)
     result = runner.invoke(app, [str(missing)])
     assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------------------
+# --auto-direction フラグと排他バリデーション
+# ---------------------------------------------------------------------------
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_auto_direction_routes_to_run_with_flag(
+    mock_run: MagicMock,
+    tmp_path: Path,
+) -> None:
+    """--auto-direction 単体指定で auto_direction=True、direction は None"""
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "5", "--auto-direction", "--out", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.kwargs.get("auto_direction") is True
+    assert mock_run.call_args.args[0].direction is None
+
+
+def test_capture_direction_and_auto_direction_conflict_exits_nonzero(
+    tmp_path: Path,
+) -> None:
+    """--direction と --auto-direction の同時指定はエラー"""
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        [
+            "--name",
+            "x",
+            "--pages",
+            "5",
+            "--direction",
+            "rtl",
+            "--auto-direction",
+            "--out",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code != 0
+    assert "同時指定" in result.output
+
+
+def test_capture_neither_direction_nor_auto_direction_exits_nonzero(
+    tmp_path: Path,
+) -> None:
+    """--direction も --auto-direction も未指定はエラー"""
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "5", "--out", str(tmp_path)],
+    )
+    assert result.exit_code != 0
+    assert "いずれか" in result.output
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_existing_direction_still_works(
+    mock_run: MagicMock,
+    tmp_path: Path,
+) -> None:
+    """後方互換: --direction rtl 単体で従来通り動く"""
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "5", "--direction", "rtl", "--out", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.args[0].direction is Direction.RTL
+    assert mock_run.call_args.kwargs.get("auto_direction") is False
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_auto_direction_combined_with_auto_stop(
+    mock_run: MagicMock,
+    tmp_path: Path,
+) -> None:
+    """--auto-direction と --auto-stop を組み合わせて指定できる"""
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        [
+            "--name",
+            "x",
+            "--pages",
+            "100",
+            "--auto-direction",
+            "--auto-stop",
+            "--out",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.kwargs.get("auto_direction") is True
+    assert mock_run.call_args.kwargs.get("auto_stop") is True

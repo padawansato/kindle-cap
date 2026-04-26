@@ -12,11 +12,16 @@ from .preflight import PreflightError
 
 def capture(
     pages: int = typer.Option(..., "--pages", help="撮影ページ数"),
-    direction: Direction = typer.Option(
-        ...,
+    direction: Direction | None = typer.Option(
+        None,
         "--direction",
-        help="rtl=右綴じ、ltr=左綴じ",
+        help="rtl=右綴じ、ltr=左綴じ（--auto-direction を使う場合は不要）",
         case_sensitive=False,
+    ),
+    auto_direction: bool = typer.Option(
+        False,
+        "--auto-direction",
+        help="表紙起点で direction を試写判定（rtl/ltr の手動指定が不要）",
     ),
     name: str = typer.Option(
         None,
@@ -41,6 +46,17 @@ def capture(
         help="連続する 2 ページが同一なら書籍末尾と判断して停止",
     ),
 ) -> None:
+    if direction is not None and auto_direction:
+        raise typer.BadParameter(
+            "--direction と --auto-direction は同時指定できません",
+            param_hint="--direction / --auto-direction",
+        )
+    if direction is None and not auto_direction:
+        raise typer.BadParameter(
+            "--direction または --auto-direction のいずれかを指定してください",
+            param_hint="--direction / --auto-direction",
+        )
+
     if name is None:
         name = typer.prompt("書籍名 (出力ディレクトリ名)")
 
@@ -54,7 +70,12 @@ def capture(
     )
 
     try:
-        orchestrator_run(config, dry_run=dry_run, auto_stop=auto_stop)
+        orchestrator_run(
+            config,
+            dry_run=dry_run,
+            auto_stop=auto_stop,
+            auto_direction=auto_direction,
+        )
     except PreflightError as e:
         typer.echo(f"[エラー] {e}", err=True)
         raise typer.Exit(code=1) from e
