@@ -6,6 +6,7 @@
 
 ### Added
 
+- `--auto-direction`：表紙起点で試写し、ページ綴じ方向（rtl/ltr）を自動判定。試写 3 枚は本番に流用するため重複撮影しない（issue #15）
 - 開発者向けドキュメント（`CHANGELOG.md`、`CONTRIBUTING.md`）
 - GitHub の Issue / Pull Request テンプレート（`.github/`）
 
