@@ -115,3 +115,21 @@ class TestRenderIndex:
         result = render_index(meta, [])
         assert result["pages"] == []
         assert result["page_count"] == 0
+
+    def test_png_path_not_under_output_dir_does_not_crash(self) -> None:
+        """`--out` 指定で png_path が output_dir の外側に出ても relative_to で落ちないこと."""
+        meta = BookMetadata(
+            title="my-book",
+            page_count=1,
+            captured_at=datetime(2026, 4, 28, 21, 0, 0, tzinfo=UTC),
+            ocr_engine="yomitoku",
+            output_dir=Path("/elsewhere/output"),
+        )
+        page = PageText(
+            page_number=1,
+            png_path=Path("/source/book/page_001.png"),
+            markdown="x",
+            ocr_engine="yomitoku",
+        )
+        result = render_index(meta, [page])
+        assert result["pages"][0]["png"] == "page_001.png"
