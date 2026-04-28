@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -5,6 +6,7 @@ import pytest
 from PIL import Image
 
 from kindle_cap.capture import (
+    CaptureError,
     _build_screencapture_args,
     _flatten_alpha,
     capture_rect,
@@ -187,3 +189,50 @@ def test_capture_rect_uses_check_true(mock_run: MagicMock, tmp_path: Path) -> No
     mock_run.side_effect = _stub_screencapture_factory(out)
     capture_rect(Geometry(0, 0, 10, 10), out)
     assert mock_run.call_args.kwargs.get("check") is True
+
+
+# ---------------------------------------------------------------------------
+# 防御層: macOS の screencapture は書き込み失敗時でも exit 0 で抜けることがある。
+# check=True だけでは検知できないので out_path の存在を確認し、無ければ
+# CaptureError を上げて呼び出し元に意味のあるエラーを返す。
+# ---------------------------------------------------------------------------
+
+
+@patch("kindle_cap.capture.subprocess.run")
+def test_capture_rect_raises_capture_error_when_file_not_created(
+    mock_run: MagicMock,
+    tmp_path: Path,
+) -> None:
+    out = tmp_path / "missing.png"
+    mock_run.return_value = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout="", stderr="screencapture: cannot write file"
+    )
+    with pytest.raises(CaptureError):
+        capture_rect(Geometry(0, 0, 10, 10), out)
+
+
+@patch("kindle_cap.capture.subprocess.run")
+def test_capture_rect_error_includes_stderr_text(
+    mock_run: MagicMock,
+    tmp_path: Path,
+) -> None:
+    out = tmp_path / "missing.png"
+    mock_run.return_value = subprocess.CompletedProcess(
+        args=[],
+        returncode=0,
+        stdout="",
+        stderr="cannot write file to intended destination",
+    )
+    with pytest.raises(CaptureError, match="cannot write file to intended destination"):
+        capture_rect(Geometry(0, 0, 10, 10), out)
+
+
+@patch("kindle_cap.capture.subprocess.run")
+def test_capture_rect_error_includes_out_path(
+    mock_run: MagicMock,
+    tmp_path: Path,
+) -> None:
+    out = tmp_path / "page_153.png"
+    mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+    with pytest.raises(CaptureError, match=r"page_153\.png"):
+        capture_rect(Geometry(0, 0, 10, 10), out)
