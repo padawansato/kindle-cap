@@ -24,6 +24,11 @@ dependencies = [
     "pillow>=10.0",
 ]
 
+[project.optional-dependencies]
+ocr = [
+    "yomitoku>=0.4",
+]
+
 [project.urls]
 Repository = "https://github.com/padawansato/kindle-cap"
 Issues = "https://github.com/padawansato/kindle-cap/issues"
@@ -31,6 +36,7 @@ Issues = "https://github.com/padawansato/kindle-cap/issues"
 [project.scripts]
 kindle-cap = "kindle_cap.cli:run_capture"
 kindle-cap-pdf = "kindle_cap.cli:run_rebuild_pdf"
+book-ocr = "book_ocr.cli:run_ocr"
 
 [dependency-groups]
 dev = [
@@ -74,6 +80,7 @@ quote-style = "double"
 
 [tool.ruff.lint.per-file-ignores]
 "src/kindle_cap/cli.py" = ["B008"]  # typer.Option / typer.Argument の標準パターン
+"src/book_ocr/cli.py" = ["B008"]  # typer.Option / typer.Argument の標準パターン
 "tests/**/*.py" = ["B017"]  # frozen dataclass の不変性検証で bare Exception を使う
 
 [tool.mypy]
@@ -82,6 +89,10 @@ strict = true
 # サードパーティの型情報が無いライブラリは untyped 許容（漸進的に厳格化）
 [[tool.mypy.overrides]]
 module = ["img2pdf", "img2pdf.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["yomitoku", "yomitoku.*"]
 ignore_missing_imports = true
 
 [build-system]

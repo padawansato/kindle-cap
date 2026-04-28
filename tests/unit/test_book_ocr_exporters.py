@@ -11,7 +11,9 @@ from book_ocr.exporters.page_md import render_page_md
 from book_ocr.models import BookMetadata, PageText
 
 
-def _make_page(n: int, markdown: str = "...", out_dir: Path = Path("/tmp/output/my-book")) -> PageText:
+def _make_page(
+    n: int, markdown: str = "...", out_dir: Path = Path("/tmp/output/my-book")
+) -> PageText:
     return PageText(
         page_number=n,
         png_path=out_dir / f"page_{n:03d}.png",

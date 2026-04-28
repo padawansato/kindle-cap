@@ -25,9 +25,7 @@ def run(
     seen: set[int] = set()
     for page in pages:
         if page.page_number in seen:
-            raise ValueError(
-                f"duplicate page_number {page.page_number} returned by engine"
-            )
+            raise ValueError(f"duplicate page_number {page.page_number} returned by engine")
         seen.add(page.page_number)
 
     index = render_index(meta, pages)
