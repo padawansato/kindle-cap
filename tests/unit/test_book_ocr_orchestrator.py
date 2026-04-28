@@ -22,16 +22,17 @@ class FakeEngine:
     def name(self) -> str:
         return "fake"
 
-    def run(self, png: Path) -> PageText:
-        # page_001.png -> 1, page_042.png -> 42
-        stem = png.stem  # e.g. "page_001"
-        n = int(stem.split("_")[-1])
+    def _one(self, png: Path) -> PageText:
+        n = int(png.stem.split("_")[-1])  # page_001.png -> 1
         return PageText(
             page_number=n,
             png_path=png,
             markdown=self._body_template.format(n=n),
             ocr_engine=self.name,
         )
+
+    def run_batch(self, pngs: list[Path]) -> list[PageText]:
+        return [self._one(p) for p in pngs]
 
 
 def _make_meta(out_dir: Path, page_count: int = 2) -> BookMetadata:
@@ -117,8 +118,8 @@ class TestOrchestratorRun:
         assert index["pages"] == []
         assert book_md == ""
 
-    def test_engine_called_once_per_png(self, tmp_path: Path) -> None:
-        """重複呼び出しがないことを確認 (count を取る FakeEngine)."""
+    def test_engine_run_batch_called_exactly_once(self, tmp_path: Path) -> None:
+        """run_batch が 1 回だけ呼ばれることを確認 (バッチ最適化を保証)."""
         call_count = 0
 
         class CountingFakeEngine:
@@ -126,22 +127,24 @@ class TestOrchestratorRun:
             def name(self) -> str:
                 return "fake"
 
-            def run(self, png: Path) -> PageText:
+            def run_batch(self, pngs: list[Path]) -> list[PageText]:
                 nonlocal call_count
                 call_count += 1
-                n = int(png.stem.split("_")[-1])
-                return PageText(
-                    page_number=n,
-                    png_path=png,
-                    markdown="x",
-                    ocr_engine=self.name,
-                )
+                return [
+                    PageText(
+                        page_number=int(p.stem.split("_")[-1]),
+                        png_path=p,
+                        markdown="x",
+                        ocr_engine=self.name,
+                    )
+                    for p in pngs
+                ]
 
         meta = _make_meta(tmp_path)
         pngs = [tmp_path / "page_001.png", tmp_path / "page_002.png"]
         orchestrator.run(CountingFakeEngine(), meta, pngs)
 
-        assert call_count == 2
+        assert call_count == 1
 
 
 class TestOrchestratorRunInputValidation:
@@ -157,14 +160,17 @@ class TestOrchestratorRunInputValidation:
             def name(self) -> str:
                 return "broken"
 
-            def run(self, png: Path) -> PageText:
+            def run_batch(self, pngs: list[Path]) -> list[PageText]:
                 # png のファイル名に関わらず常に page_number=1 を返す
-                return PageText(
-                    page_number=1,
-                    png_path=png,
-                    markdown="x",
-                    ocr_engine=self.name,
-                )
+                return [
+                    PageText(
+                        page_number=1,
+                        png_path=p,
+                        markdown="x",
+                        ocr_engine=self.name,
+                    )
+                    for p in pngs
+                ]
 
         meta = _make_meta(tmp_path)
         pngs = [tmp_path / "page_001.png", tmp_path / "page_002.png"]

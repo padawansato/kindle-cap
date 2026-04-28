@@ -20,16 +20,15 @@ def run(
 
     副作用なし。ディスク書き込みは writer.py が担う。
     """
-    pages: list[PageText] = []
+    pages = engine.run_batch(png_paths)
+
     seen: set[int] = set()
-    for png in png_paths:
-        page = engine.run(png)
+    for page in pages:
         if page.page_number in seen:
             raise ValueError(
-                f"duplicate page_number {page.page_number} returned by engine for {png}"
+                f"duplicate page_number {page.page_number} returned by engine"
             )
         seen.add(page.page_number)
-        pages.append(page)
 
     index = render_index(meta, pages)
     book_md = render_book_md(pages)
