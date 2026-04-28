@@ -45,6 +45,7 @@ dev = [
 testpaths = ["tests"]
 markers = [
     "live: requires Kindle.app running with a book on the first page",
+    "live_ocr: requires yomitoku binary and sample PNGs (PoC artifacts) to be present",
 ]
 
 [tool.ruff]
