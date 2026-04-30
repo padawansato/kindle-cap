@@ -31,7 +31,7 @@ jobs:
         run: uv run ruff format --check src/ tests/
 
       - name: Type check (mypy strict on src/)
-        run: uv run mypy src/kindle_cap/
+        run: uv run mypy src/
 
       - name: Run unit tests
         run: uv run pytest tests/unit/ -v --tb=short

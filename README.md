@@ -118,6 +118,49 @@ uv run kindle-cap-pdf output/my-book
 # → output/my-book.pdf を再生成
 ```
 
+### book-ocr — OCR で Markdown / index.json を生成（オプション）
+
+ClaudeCode 等から書籍内容を「対話的に質問・情報源として活用」したい場合、撮影後に `book-ocr` を実行すると [YomiToku](https://github.com/kotaro-kinoshita/yomitoku) で OCR し、grep 可能な Markdown と index.json を生成する（既存 PNG / PDF はそのまま残る）。
+
+```bash
+# YomiToku を含めて再インストール（約 1.5GB の追加依存）
+uv sync --extra ocr
+
+# キャプチャ後に OCR を実行
+uv run kindle-cap --name my-book --pages 200 --auto-direction
+uv run book-ocr output/my-book/
+```
+
+実行後の出力:
+
+```text
+output/my-book/
+  page_001.png ...                # 既存（キャプチャ時）
+  index.json                      # 新規。{title, page_count, captured_at, ocr_engine, pages}
+  my-book.md                      # 新規。全文連結（<!-- page:NNN --> 区切り）— grep 一発用
+  pages/
+    page_001.md ...               # 新規。ページ単位 Markdown
+output/my-book.pdf                # 既存。視覚確認用
+```
+
+#### book-ocr のオプション
+
+| オプション | デフォルト | 説明 |
+|---|---|---|
+| `--name TEXT` | book_dir の basename | 書籍名（Markdown ファイル名と index.json に反映） |
+| `--device mps\|cpu\|cuda` | `mps` | OCR 推論デバイス（Apple Silicon は `mps` 推奨） |
+| `--reading-order auto\|left2right\|top2bottom\|right2left` | `auto` | 読み順（自動検出推奨） |
+| `--ignore-meta / --no-ignore-meta` | `--ignore-meta` | Kindle のヘッダー/フッターを除外 |
+| `--out PATH` | `<book_dir>` | 出力先（省略時は book_dir に書き戻す） |
+
+#### 性能の目安（Apple Silicon MPS）
+
+- 1 ページあたり約 7〜9 秒
+- 200 ページ本: 約 26 分 / 500 ページ本: 約 64 分
+- 縦書き・横書きどちらも対応
+
+詳細な PoC レポートは [`docs/ocr-bench/2026-04-28.md`](docs/ocr-bench/2026-04-28.md) を参照。
+
 ### よくある使い方
 
 ```bash
@@ -175,7 +218,7 @@ uv run pytest -m live
 # 手動で全チェック
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
-uv run mypy src/kindle_cap/
+uv run mypy src/
 uv run pre-commit run --all-files   # 上記をまとめて実行
 ```
 
