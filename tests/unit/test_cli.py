@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -11,7 +12,7 @@ from kindle_cap.pdf import PdfBuildError
 runner = CliRunner()
 
 
-def _make_app(func) -> typer.Typer:
+def _make_app(func: Callable[..., None]) -> typer.Typer:
     app = typer.Typer()
     app.command()(func)
     return app

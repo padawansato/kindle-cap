@@ -1,5 +1,7 @@
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -152,8 +154,8 @@ def test_flatten_alpha_replaces_transparent_with_white_background(tmp_path: Path
 # ---------------------------------------------------------------------------
 
 
-def _stub_screencapture_factory(out_path: Path, mode: str = "RGBA"):
-    def side_effect(cmd, **kwargs):
+def _stub_screencapture_factory(out_path: Path, mode: str = "RGBA") -> Callable[..., None]:
+    def side_effect(cmd: list[str], **kwargs: Any) -> None:
         Image.new(mode, (10, 10), "red" if mode == "RGB" else (255, 0, 0, 200)).save(out_path)
 
     return side_effect

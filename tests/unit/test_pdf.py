@@ -1,5 +1,6 @@
 import errno
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -103,11 +104,11 @@ def test_build_pdf_streams_to_disk_without_loading_full_bytes_into_memory(
     import img2pdf
 
     pngs = [_make_rgb_png(tmp_path / "x.png")]
-    captured_kwargs: dict = {}
+    captured_kwargs: dict[str, Any] = {}
 
     real_convert = img2pdf.convert
 
-    def spy(*args, **kwargs):
+    def spy(*args: Any, **kwargs: Any) -> Any:
         captured_kwargs.update(kwargs)
         return real_convert(*args, **kwargs)
 
