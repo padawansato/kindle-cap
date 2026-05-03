@@ -19,6 +19,8 @@ class YomiTokuEngine:
     reading_order: str = "auto"
     ignore_meta: bool = True
     yomitoku_bin: Path | None = None  # 隔離 venv のバイナリを指す用
+    # 1 ページ ~8 秒 × 200 ページ + 余裕で 30 分。巨大本では呼び出し側で延長
+    timeout_sec: float = 1800.0
 
     @property
     def name(self) -> str:
@@ -54,7 +56,21 @@ class YomiTokuEngine:
             if self.ignore_meta:
                 cmd.append("--ignore_meta")
 
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            try:
+                result = subprocess.run(
+                    cmd,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout_sec,
+                )
+            except subprocess.TimeoutExpired as e:
+                raise RuntimeError(
+                    f"yomitoku timeout (exceeded {self.timeout_sec}s). "
+                    f"巨大本では timeout_sec を延長するか、ページ数を分割してください。"
+                ) from e
+
+            _ensure_yomitoku_succeeded(result.returncode, result.stdout, result.stderr)
 
             return _collect_pages(pngs, output_dir, input_dir.name, engine_name=self.name)
 
@@ -71,6 +87,17 @@ class YomiTokuEngine:
                 f"{_BINARY_NAME} not found in PATH. Install with: uv pip install yomitoku"
             )
         return Path(path)
+
+
+def _ensure_yomitoku_succeeded(returncode: int, stdout: str, stderr: str) -> None:
+    """yomitoku subprocess の戻り値を検査し、非ゼロ exit なら RuntimeError を raise.
+
+    純粋関数として切り出しているので unit test で実 subprocess なしに網羅できる。
+    """
+    if returncode != 0:
+        raise RuntimeError(
+            f"yomitoku failed (exit={returncode}):\nstdout: {stdout}\nstderr: {stderr}"
+        )
 
 
 def _collect_pages(
