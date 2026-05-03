@@ -1,5 +1,6 @@
 from pathlib import Path
-from unittest.mock import patch
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -10,8 +11,8 @@ from kindle_cap.preflight import PreflightError
 _GEOM = Geometry(x=0, y=0, width=100, height=100)
 
 
-def _config(tmp_path: Path, **overrides) -> CaptureConfig:
-    base = dict(
+def _config(tmp_path: Path, **overrides: Any) -> CaptureConfig:
+    base: dict[str, Any] = dict(
         name="bk",
         pages=3,
         direction=Direction.RTL,
@@ -30,14 +31,14 @@ def _config(tmp_path: Path, **overrides) -> CaptureConfig:
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_three_pages_calls_each_step_correctly(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
     mock_geom.return_value = _GEOM
     run(_config(tmp_path, pages=3))
     assert mock_pre.call_count == 1
@@ -55,14 +56,14 @@ def test_run_three_pages_calls_each_step_correctly(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_dry_run_takes_one_shot_and_skips_pdf(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
     mock_geom.return_value = _GEOM
     run(_config(tmp_path), dry_run=True)
     assert mock_cap.call_count == 1
@@ -77,14 +78,14 @@ def test_run_dry_run_takes_one_shot_and_skips_pdf(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_dry_run_writes_to_dry_run_png(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
     mock_geom.return_value = _GEOM
     run(_config(tmp_path), dry_run=True)
     out_path = mock_cap.call_args[0][1]
@@ -98,14 +99,14 @@ def test_run_dry_run_writes_to_dry_run_png(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_keyboard_interrupt_keeps_partial_and_skips_pdf(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
     mock_geom.return_value = _GEOM
     mock_cap.side_effect = [None, KeyboardInterrupt(), None]
     run(_config(tmp_path, pages=5))
@@ -119,14 +120,14 @@ def test_run_keyboard_interrupt_keeps_partial_and_skips_pdf(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_deletes_existing_pngs_before_capture(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
     mock_geom.return_value = _GEOM
     out_dir = tmp_path / "bk"
     out_dir.mkdir()
@@ -143,17 +144,17 @@ def test_run_deletes_existing_pngs_before_capture(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_no_keep_png_removes_pngs_after_pdf(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
     mock_geom.return_value = _GEOM
 
-    def touch(geom, path):
+    def touch(geom: Geometry, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"x")
 
@@ -170,14 +171,14 @@ def test_run_no_keep_png_removes_pngs_after_pdf(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_writes_pdf_to_out_root(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
     mock_geom.return_value = _GEOM
     run(_config(tmp_path, name="hello", pages=2))
     pdf_path = mock_pdf.call_args[0][1]
@@ -191,15 +192,15 @@ def test_run_writes_pdf_to_out_root(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_prints_progress_for_each_page(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-    capsys,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """長尺キャプチャの UX として、各ページごとに進捗を出すこと"""
     mock_geom.return_value = _GEOM
     run(_config(tmp_path, pages=3))
@@ -216,15 +217,15 @@ def test_run_prints_progress_for_each_page(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_progress_reflects_actual_page_count(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-    capsys,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """N ページ指定なら 'N/N' まで含まれること（最終ページの進捗が抜けないこと）"""
     mock_geom.return_value = _GEOM
     run(_config(tmp_path, pages=10))
@@ -239,15 +240,15 @@ def test_run_progress_reflects_actual_page_count(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_dry_run_does_not_print_progress_count(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-    capsys,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """dry-run はループしないので 1/N 形式の進捗は出ない"""
     mock_geom.return_value = _GEOM
     run(_config(tmp_path, pages=1), dry_run=True)
@@ -260,11 +261,11 @@ def test_run_dry_run_does_not_print_progress_count(
 # ---------------------------------------------------------------------------
 
 
-def _capture_factory_with_termination(unique_pages: int):
+def _capture_factory_with_termination(unique_pages: int) -> Any:
     """unique_pages 枚目までは別内容、それ以降は最後の内容を繰り返す側"""
     counter = {"n": 0}
 
-    def _capture(geom, path):
+    def _capture(geom: Geometry, path: Path) -> None:
         counter["n"] += 1
         path.parent.mkdir(parents=True, exist_ok=True)
         if counter["n"] <= unique_pages:
@@ -282,14 +283,14 @@ def _capture_factory_with_termination(unique_pages: int):
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_auto_stop_halts_on_duplicate_consecutive_pages(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
     """3 ユニークページの後に同一ページ繰り返し → auto-stop で 3 ページのみ取る"""
     mock_geom.return_value = _GEOM
     mock_cap.side_effect = _capture_factory_with_termination(unique_pages=3)
@@ -305,14 +306,14 @@ def test_run_auto_stop_halts_on_duplicate_consecutive_pages(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_auto_stop_off_keeps_full_pages(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
     """auto_stop=False（デフォルト）なら、重複ページがあっても指定 N ページ全部撮る"""
     mock_geom.return_value = _GEOM
     mock_cap.side_effect = _capture_factory_with_termination(unique_pages=3)
@@ -328,14 +329,14 @@ def test_run_auto_stop_off_keeps_full_pages(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_auto_stop_removes_duplicate_png_from_disk(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
     """終端検出時に書いた重複 PNG ファイルは削除されること"""
     mock_geom.return_value = _GEOM
     mock_cap.side_effect = _capture_factory_with_termination(unique_pages=2)
@@ -352,19 +353,19 @@ def test_run_auto_stop_removes_duplicate_png_from_disk(
 @patch("kindle_cap.orchestrator.activate_kindle")
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_auto_stop_with_all_unique_pages_takes_full_count(
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
-    tmp_path,
-):
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
     """全ページがユニークなら、auto_stop でも N 枚撮る"""
     mock_geom.return_value = _GEOM
     counter = {"n": 0}
 
-    def _all_unique(geom, path):
+    def _all_unique(geom: Geometry, path: Path) -> None:
         counter["n"] += 1
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(f"unique-{counter['n']}".encode())
@@ -399,11 +400,11 @@ def test_image_hash_changes_on_byte_change(tmp_path: Path) -> None:
 @patch("kindle_cap.orchestrator.get_window_geometry")
 @patch("kindle_cap.orchestrator.activate_kindle")
 def test_capture_book_with_start_index_skips_purge_and_resumes(
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
     tmp_path: Path,
 ) -> None:
     """start_index=4 のとき page_001..003 は採用されたまま、page_004 から撮影。
@@ -429,11 +430,11 @@ def test_capture_book_with_start_index_skips_purge_and_resumes(
 @patch("kindle_cap.orchestrator.get_window_geometry")
 @patch("kindle_cap.orchestrator.activate_kindle")
 def test_capture_book_with_start_index_one_purges_old_pages(
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
     tmp_path: Path,
 ) -> None:
     """通常の start_index=1 では既存 page_*.png を purge する（既存挙動）。"""
@@ -454,11 +455,11 @@ def test_capture_book_with_start_index_one_purges_old_pages(
 @patch("kindle_cap.orchestrator.get_window_geometry")
 @patch("kindle_cap.orchestrator.activate_kindle")
 def test_capture_book_with_seed_hashes_stops_immediately_when_first_page_matches(
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
     tmp_path: Path,
 ) -> None:
     """seed_hashes の最後と本番初回ページのハッシュが一致すれば auto_stop が即停止。"""
@@ -492,11 +493,11 @@ def test_capture_book_with_seed_hashes_stops_immediately_when_first_page_matches
 @patch("kindle_cap.orchestrator.get_window_geometry")
 @patch("kindle_cap.orchestrator.activate_kindle")
 def test_capture_book_passes_existing_pages_to_pdf_when_start_index_gt_one(
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
     tmp_path: Path,
 ) -> None:
     """page_001..start_index-1.png が PDF 入力に含まれる。"""
@@ -523,11 +524,11 @@ def test_capture_book_passes_existing_pages_to_pdf_when_start_index_gt_one(
 @patch("kindle_cap.orchestrator.get_window_geometry")
 @patch("kindle_cap.orchestrator.activate_kindle")
 def test_capture_book_default_start_index_unchanged_behavior(
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
     tmp_path: Path,
 ) -> None:
     """start_index 引数を渡さない既存呼び出しは挙動不変（page_001 から N 枚撮る）。"""
@@ -544,10 +545,10 @@ def test_capture_book_default_start_index_unchanged_behavior(
 # ---------------------------------------------------------------------------
 
 
-def _make_detect_stub(direction: Direction, num_pngs: int):
+def _make_detect_stub(direction: Direction, num_pngs: int) -> Any:
     """detect_direction の挙動を模倣: out_dir に試写 PNG を書き出してから返す。"""
 
-    def _stub(*, out_dir, **_kwargs):
+    def _stub(*, out_dir: Path, **_kwargs: Any) -> tuple[Direction, list[Path]]:
         pngs = []
         for i in range(1, num_pngs + 1):
             p = out_dir / f"page_{i:03d}.png"
@@ -566,13 +567,13 @@ def _make_detect_stub(direction: Direction, num_pngs: int):
 @patch("kindle_cap.orchestrator.preflight")
 @patch("kindle_cap.orchestrator.detect_direction")
 def test_run_auto_direction_resolves_direction_via_detect(
-    mock_detect,
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
+    mock_detect: MagicMock,
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
     tmp_path: Path,
 ) -> None:
     """auto_direction=True で detect_direction が呼ばれ、確定した direction で本撮影"""
@@ -594,13 +595,13 @@ def test_run_auto_direction_resolves_direction_via_detect(
 @patch("kindle_cap.orchestrator.preflight")
 @patch("kindle_cap.orchestrator.detect_direction")
 def test_run_auto_direction_reuses_probe_pngs_for_first_three_pages(
-    mock_detect,
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
+    mock_detect: MagicMock,
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
     tmp_path: Path,
 ) -> None:
     """detect が 3 枚返したら、capture_rect は (pages - 3) 回しか呼ばれない"""
@@ -622,13 +623,13 @@ def test_run_auto_direction_reuses_probe_pngs_for_first_three_pages(
 @patch("kindle_cap.orchestrator.preflight")
 @patch("kindle_cap.orchestrator.detect_direction")
 def test_run_auto_direction_with_fallback_starts_at_page_001(
-    mock_detect,
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
-    mock_send,
-    mock_pdf,
+    mock_detect: MagicMock,
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
     tmp_path: Path,
 ) -> None:
     """detect が空リストを返した場合、_capture_book は通常通り start_index=1 から"""
@@ -644,8 +645,8 @@ def test_run_auto_direction_with_fallback_starts_at_page_001(
 @patch("kindle_cap.orchestrator.preflight")
 @patch("kindle_cap.orchestrator.detect_direction")
 def test_run_auto_direction_propagates_preflight_error(
-    mock_detect,
-    mock_pre,
+    mock_detect: MagicMock,
+    mock_pre: MagicMock,
     tmp_path: Path,
 ) -> None:
     """detect_direction が PreflightError を上げたら run も伝播"""
@@ -657,7 +658,7 @@ def test_run_auto_direction_propagates_preflight_error(
 
 @patch("kindle_cap.orchestrator.preflight")
 def test_run_with_direction_none_and_auto_direction_false_raises(
-    mock_pre,
+    mock_pre: MagicMock,
     tmp_path: Path,
 ) -> None:
     """direction=None かつ auto_direction=False は ValueError"""
@@ -672,11 +673,11 @@ def test_run_with_direction_none_and_auto_direction_false_raises(
 @patch("kindle_cap.orchestrator.preflight")
 @patch("kindle_cap.orchestrator.detect_direction")
 def test_run_dry_run_with_auto_direction_skips_detect(
-    mock_detect,
-    mock_pre,
-    mock_act,
-    mock_geom,
-    mock_cap,
+    mock_detect: MagicMock,
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
     tmp_path: Path,
 ) -> None:
     """dry_run=True のとき auto_direction を渡しても detect_direction は呼ばれない"""
