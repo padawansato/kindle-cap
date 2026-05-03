@@ -11,12 +11,14 @@ from pathlib import Path
 import pytest
 
 from book_ocr.engines.yomitoku import YomiTokuEngine
-from book_ocr.protocols import OCREngine
 
 
-def test_engine_satisfies_protocol() -> None:
+def test_engine_satisfies_protocol_via_duck_typing() -> None:
+    """Protocol 適合は静的型 (mypy) で担保。実行時は名と run_batch の存在で確認."""
     engine = YomiTokuEngine()
-    assert isinstance(engine, OCREngine)
+    assert hasattr(engine, "name")
+    assert isinstance(engine.name, str)
+    assert callable(engine.run_batch)
 
 
 def test_run_batch_empty_returns_empty_list() -> None:

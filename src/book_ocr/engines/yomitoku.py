@@ -11,6 +11,7 @@ from pathlib import Path
 from book_ocr.models import PageText
 
 _BINARY_NAME = "yomitoku"
+_INPUT_DIR_NAME = "input"
 
 
 @dataclass
@@ -34,7 +35,7 @@ class YomiTokuEngine:
 
         with tempfile.TemporaryDirectory() as tmp_str:
             tmp_dir = Path(tmp_str)
-            input_dir = tmp_dir / "input"
+            input_dir = tmp_dir / _INPUT_DIR_NAME
             output_dir = tmp_dir / "output"
             input_dir.mkdir()
 
@@ -72,7 +73,7 @@ class YomiTokuEngine:
 
             _ensure_yomitoku_succeeded(result.returncode, result.stdout, result.stderr)
 
-            return _collect_pages(pngs, output_dir, input_dir.name, engine_name=self.name)
+            return _collect_pages(pngs, output_dir, engine_name=self.name)
 
     def _resolve_binary(self) -> Path:
         if self.yomitoku_bin is not None:
@@ -103,15 +104,14 @@ def _ensure_yomitoku_succeeded(returncode: int, stdout: str, stderr: str) -> Non
 def _collect_pages(
     pngs: list[Path],
     output_dir: Path,
-    input_dir_name: str,
     engine_name: str,
 ) -> list[PageText]:
-    """yomitoku が書き出した `<input_dir>_<stem>_p1.md` ファイル群を PageText に変換する.
+    """yomitoku が書き出した `<_INPUT_DIR_NAME>_<stem>_p1.md` ファイル群を PageText に変換する.
 
     yomitoku CLI でディレクトリを処理すると、出力ファイル名は
     `<input_dir_name>_<file_stem>_p1.md` というプレフィクス付きで生成される
     (例: 入力ディレクトリ "input" の page_001.png → "input_page_001_p1.md")。
-    本関数は input_dir_name を引数に取り、確定した命名規則で .md を読む。
+    本関数は確定した命名規則で .md を読む。
 
     戻り値はページ番号の昇順。
     """
@@ -125,7 +125,7 @@ def _collect_pages(
                 f"Cannot derive page number from {png.name}; expected page_NNN.png"
             ) from exc
 
-        md_path = output_dir / f"{input_dir_name}_{png.stem}_p1.md"
+        md_path = output_dir / f"{_INPUT_DIR_NAME}_{png.stem}_p1.md"
         if not md_path.exists():
             raise FileNotFoundError(f"Expected yomitoku output {md_path} not found")
 

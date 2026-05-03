@@ -10,10 +10,21 @@
 - 開発者向けドキュメント（`CHANGELOG.md`、`CONTRIBUTING.md`）
 - GitHub の Issue / Pull Request テンプレート（`.github/`）
 - `kindle_cap.pdf.PdfBuildError` 例外：`build_pdf` がディスク容量不足など予測可能な要因で失敗したことを表す
+- `book_ocr.engines.yomitoku.YomiTokuEngine.timeout_sec`（デフォルト 1800 秒）：yomitoku がハングしたときに `RuntimeError` で抜けるための上限時間
+- `book_ocr.cli.run_ocr_pipeline(book_dir, ..., engine=...)`：CLI から分離した OCR パイプライン公開関数。テストや組み込み利用で `engine` を注入できる
+
+### Changed
+
+- **breaking**: `book_ocr.cli._run()` を削除。テスト/プログラム組み込みでエンジンを差し替えたい場合は新設の `book_ocr.cli.run_ocr_pipeline(book_dir, ..., engine=...)` を使う（issue #24）
+- **breaking**: `book_ocr.protocols.OCREngine` から `@runtime_checkable` を削除。Protocol 適合は静的型 (`mypy`) で担保し、`isinstance(obj, OCREngine)` は使わない（issue #24）
+- `book_ocr.engines.yomitoku._collect_pages` の `input_dir_name` 引数を削除し、モジュール定数 `_INPUT_DIR_NAME = "input"` に統一（issue #24）
 
 ### Fixed
 
 - ディスク容量不足 (`ENOSPC`) で PDF 生成が失敗したときに生 traceback を露出していたのを改修。`PdfBuildError` を raise し、CLI で日本語の説明的メッセージ + exit 1 で終了する。部分書き込みされた PDF は削除し、PNG は保持して `kindle-cap-pdf` で再生成可能 (issue #19)
+- `docs/ocr-bench/2026-04-28.md` の markdownlint 警告 5 件 (MD040 / MD032 / MD036) を解消 (issue #20)
+- `book_ocr.engines.yomitoku.YomiTokuEngine`：yomitoku subprocess の stderr 握り潰しと timeout 未設定を改修。非ゼロ exit / timeout 双方で `stdout`/`stderr`/`exit code` を含む `RuntimeError` を raise (issue #21)
+- `tests/integration/test_book_ocr_yomitoku.py` の yomitoku 不要なテスト 3 件を `tests/unit/test_book_ocr_engine.py` に移動して CI 実行対象に (issue #22)
 
 ## [0.1.0] - 2026-04-25
 

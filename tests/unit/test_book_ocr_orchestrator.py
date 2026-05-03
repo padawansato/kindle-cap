@@ -9,7 +9,6 @@ import pytest
 
 from book_ocr import orchestrator
 from book_ocr.models import BookMetadata, PageText
-from book_ocr.protocols import OCREngine
 
 
 class FakeEngine:
@@ -46,9 +45,12 @@ def _make_meta(out_dir: Path, page_count: int = 2) -> BookMetadata:
 
 
 class TestFakeEngineSatisfiesProtocol:
-    def test_fake_engine_is_recognized_as_ocr_engine(self) -> None:
+    def test_fake_engine_has_required_methods(self) -> None:
+        """Protocol 適合は静的型 (mypy) で担保。実行時は duck typing で確認."""
         engine = FakeEngine()
-        assert isinstance(engine, OCREngine)
+        assert hasattr(engine, "name")
+        assert isinstance(engine.name, str)
+        assert callable(engine.run_batch)
 
 
 class TestOrchestratorRun:

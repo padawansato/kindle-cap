@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Protocol
 
 from book_ocr.models import PageText
 
 
-@runtime_checkable
 class OCREngine(Protocol):
     @property
     def name(self) -> str: ...
