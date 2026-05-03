@@ -1,6 +1,7 @@
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -87,11 +88,11 @@ def test_is_accessibility_error_handles_none_safely() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _run_factory(outputs: list):
+def _run_factory(outputs: list[str | BaseException]) -> Callable[..., MagicMock]:
     """outputs は呼び出し順に返す stdout (str) または raise する例外のリスト"""
     iterator = iter(outputs)
 
-    def _run(*args, **kwargs):
+    def _run(*args: Any, **kwargs: Any) -> MagicMock:
         item = next(iterator)
         if isinstance(item, BaseException):
             raise item
@@ -183,8 +184,8 @@ def _capturer_writing_seq(seq: list[bytes]) -> Callable[[Geometry, Path], None]:
     return _cap
 
 
-def _detect_kwargs(tmp_path: Path, **overrides):
-    base = dict(
+def _detect_kwargs(tmp_path: Path, **overrides: Any) -> dict[str, Any]:
+    base: dict[str, Any] = dict(
         out_dir=tmp_path,
         geom_provider=lambda: Geometry(0, 0, 100, 100),
         activator=lambda: None,
