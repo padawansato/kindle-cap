@@ -13,6 +13,53 @@ from book_ocr.models import BookMetadata
 from book_ocr.protocols import OCREngine
 
 
+def run_ocr_pipeline(
+    book_dir: Path,
+    name: str | None = None,
+    device: str = "mps",
+    reading_order: str = "auto",
+    ignore_meta: bool = True,
+    out: Path | None = None,
+    engine: OCREngine | None = None,
+) -> Path:
+    """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を出力する.
+
+    `engine=None` のときは `YomiTokuEngine` を生成する。テストでは FakeEngine 等を渡す。
+
+    Returns:
+        生成された book Markdown ファイルのパス。
+    """
+    pngs = sorted(book_dir.glob("page_*.png"))
+    if not pngs:
+        raise FileNotFoundError(f"No page_*.png in {book_dir}")
+
+    title = name or book_dir.name
+    out_dir = out or book_dir
+
+    engine = engine or YomiTokuEngine(
+        device=device,
+        reading_order=reading_order,
+        ignore_meta=ignore_meta,
+    )
+    meta = BookMetadata(
+        title=title,
+        page_count=len(pngs),
+        captured_at=datetime.now(UTC),
+        ocr_engine=engine.name,
+        output_dir=out_dir,
+    )
+
+    pages, index_dict, book_md_str = orchestrator.run(engine, meta, pngs)
+    writer.write_outputs(
+        out_dir=out_dir,
+        book_md_filename=f"{title}.md",
+        index=index_dict,
+        book_md=book_md_str,
+        pages=pages,
+    )
+    return out_dir / f"{title}.md"
+
+
 def ocr(
     book_dir: Path = typer.Argument(
         ...,
@@ -38,47 +85,19 @@ def ocr(
     ),
 ) -> None:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を生成する."""
-    pngs = sorted(book_dir.glob("page_*.png"))
-    if not pngs:
-        typer.echo(f"No page_*.png in {book_dir}", err=True)
-        raise typer.Exit(1)
-
-    title = name or book_dir.name
-    out_dir = out or book_dir
-
-    engine = YomiTokuEngine(
-        device=device,
-        reading_order=reading_order,
-        ignore_meta=ignore_meta,
-    )
-    meta = BookMetadata(
-        title=title,
-        page_count=len(pngs),
-        captured_at=datetime.now(UTC),
-        ocr_engine=engine.name,
-        output_dir=out_dir,
-    )
-
-    _run(engine, meta, pngs, out_dir, book_md_filename=f"{title}.md")
-    typer.echo(f"OCR complete: {out_dir}/{title}.md")
-
-
-def _run(
-    engine: OCREngine,
-    meta: BookMetadata,
-    png_paths: list[Path],
-    out_dir: Path,
-    book_md_filename: str,
-) -> None:
-    """テストから直接呼べる engine 注入ポイント."""
-    pages, index_dict, book_md_str = orchestrator.run(engine, meta, png_paths)
-    writer.write_outputs(
-        out_dir=out_dir,
-        book_md_filename=book_md_filename,
-        index=index_dict,
-        book_md=book_md_str,
-        pages=pages,
-    )
+    try:
+        out_path = run_ocr_pipeline(
+            book_dir=book_dir,
+            name=name,
+            device=device,
+            reading_order=reading_order,
+            ignore_meta=ignore_meta,
+            out=out,
+        )
+    except FileNotFoundError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
+    typer.echo(f"OCR complete: {out_path}")
 
 
 def run_ocr() -> None:
