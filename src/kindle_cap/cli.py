@@ -6,7 +6,7 @@ import typer
 
 from .config import CaptureConfig, Direction
 from .orchestrator import run as orchestrator_run
-from .pdf import build_pdf
+from .pdf import PdfBuildError, build_pdf
 from .preflight import PreflightError
 
 
@@ -79,6 +79,9 @@ def capture(
     except PreflightError as e:
         typer.echo(f"[エラー] {e}", err=True)
         raise typer.Exit(code=1) from e
+    except PdfBuildError as e:
+        typer.echo(f"[エラー] {e}", err=True)
+        raise typer.Exit(code=1) from e
 
 
 def rebuild_pdf(
@@ -96,7 +99,11 @@ def rebuild_pdf(
         typer.echo(f"[エラー] {directory} に page_*.png が見つかりません", err=True)
         raise typer.Exit(code=1)
     out_path = directory.parent / f"{directory.name}.pdf"
-    build_pdf(pngs, out_path)
+    try:
+        build_pdf(pngs, out_path)
+    except PdfBuildError as e:
+        typer.echo(f"[エラー] {e}", err=True)
+        raise typer.Exit(code=1) from e
     typer.echo(f"PDF を作成しました: {out_path}")
 
 
