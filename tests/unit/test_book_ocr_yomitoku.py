@@ -21,14 +21,14 @@ from book_ocr.engines.yomitoku import (
 class TestEnsureYomitokuSucceeded:
     def test_does_not_raise_on_zero_returncode(self) -> None:
         # 何も raise しないこと (戻り値 None)
-        assert _ensure_yomitoku_succeeded(0, "ok", "") is None
+        _ensure_yomitoku_succeeded(0, "ok", "")
 
     def test_does_not_raise_when_stderr_present_but_returncode_zero(self) -> None:
         """yomitoku は warning を stderr に書きつつ exit 0 を返すことがある.
 
         returncode=0 なら成功とみなす (stderr 内容に関わらず)。
         """
-        assert _ensure_yomitoku_succeeded(0, "", "warning: deprecated") is None
+        _ensure_yomitoku_succeeded(0, "", "warning: deprecated")
 
     def test_raises_runtime_error_on_nonzero_returncode(self) -> None:
         with pytest.raises(RuntimeError):
