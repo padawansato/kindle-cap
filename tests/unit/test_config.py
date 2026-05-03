@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -10,8 +11,8 @@ from kindle_cap.config import CaptureConfig, Direction, Geometry
 
 
 def test_direction_string_values() -> None:
-    assert Direction.RTL == "rtl"
-    assert Direction.LTR == "ltr"
+    assert Direction.RTL.value == "rtl"
+    assert Direction.LTR.value == "ltr"
 
 
 def test_direction_has_only_two_values() -> None:
@@ -53,8 +54,8 @@ def test_geometry_hashable() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _valid_config_kwargs(**overrides):
-    base = dict(
+def _valid_config_kwargs(**overrides: Any) -> dict[str, Any]:
+    base: dict[str, Any] = dict(
         name="my-book",
         pages=10,
         direction=Direction.RTL,
