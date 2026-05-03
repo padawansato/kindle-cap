@@ -18,6 +18,7 @@
 - **breaking**: `book_ocr.cli._run()` を削除。テスト/プログラム組み込みでエンジンを差し替えたい場合は新設の `book_ocr.cli.run_ocr_pipeline(book_dir, ..., engine=...)` を使う（issue #24）
 - **breaking**: `book_ocr.protocols.OCREngine` から `@runtime_checkable` を削除。Protocol 適合は静的型 (`mypy`) で担保し、`isinstance(obj, OCREngine)` は使わない（issue #24）
 - `book_ocr.engines.yomitoku._collect_pages` の `input_dir_name` 引数を削除し、モジュール定数 `_INPUT_DIR_NAME = "input"` に統一（issue #24）
+- `book_ocr` パッケージに `py.typed` marker を追加。下流プロジェクトおよび当リポジトリの `tests/` で `book_ocr.*` の型情報が認識されるようになる（issue #11）
 
 ### Fixed
 
