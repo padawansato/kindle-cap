@@ -1,10 +1,12 @@
+import errno
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from PIL import Image
 from pypdf import PdfReader
 
-from kindle_cap.pdf import build_pdf
+from kindle_cap.pdf import PdfBuildError, build_pdf
 
 
 @pytest.fixture
@@ -163,3 +165,98 @@ def test_build_pdf_preserves_page_order(tmp_path: Path) -> None:
     reader = PdfReader(str(out))
     assert len(reader.pages) == 3
     # 順序の本格検証は PDF 内画像抽出が必要 — ここではページ数のみで妥協
+
+
+# ---------------------------------------------------------------------------
+# ディスク容量不足 (ENOSPC) ハンドリング
+# ---------------------------------------------------------------------------
+
+
+def test_pdf_build_error_is_exception_subclass() -> None:
+    assert issubclass(PdfBuildError, Exception)
+
+
+def test_build_pdf_raises_pdf_build_error_on_enospc(tmp_path: Path) -> None:
+    """img2pdf が ENOSPC で OSError を投げたら PdfBuildError に変換される."""
+    p = _make_rgb_png(tmp_path / "page_001.png")
+    out = tmp_path / "out.pdf"
+
+    enospc = OSError(errno.ENOSPC, "No space left on device")
+    with (
+        patch("kindle_cap.pdf.img2pdf.convert", side_effect=enospc),
+        pytest.raises(PdfBuildError),
+    ):
+        build_pdf([p], out)
+
+
+def test_build_pdf_removes_partial_pdf_on_enospc(tmp_path: Path) -> None:
+    """ENOSPC 時、書きかけの PDF ファイルは残さない."""
+    p = _make_rgb_png(tmp_path / "page_001.png")
+    out = tmp_path / "out.pdf"
+
+    enospc = OSError(errno.ENOSPC, "No space left on device")
+    with (
+        patch("kindle_cap.pdf.img2pdf.convert", side_effect=enospc),
+        pytest.raises(PdfBuildError),
+    ):
+        build_pdf([p], out)
+
+    assert not out.exists(), "部分書き込みされた PDF は削除されているべき"
+
+
+def test_build_pdf_keeps_png_files_on_enospc(tmp_path: Path) -> None:
+    """ENOSPC 時、入力 PNG は削除しない (再生成のため)."""
+    p = _make_rgb_png(tmp_path / "page_001.png")
+    out = tmp_path / "out.pdf"
+
+    enospc = OSError(errno.ENOSPC, "No space left on device")
+    with (
+        patch("kindle_cap.pdf.img2pdf.convert", side_effect=enospc),
+        pytest.raises(PdfBuildError),
+    ):
+        build_pdf([p], out)
+
+    assert p.exists(), "入力 PNG は ENOSPC 時も保持される"
+
+
+def test_build_pdf_error_message_includes_png_directory(tmp_path: Path) -> None:
+    """エラーメッセージに PNG が残っている場所を含めて、ユーザーが再生成手順を分かる."""
+    p = _make_rgb_png(tmp_path / "page_001.png")
+    out = tmp_path / "out.pdf"
+
+    enospc = OSError(errno.ENOSPC, "No space left on device")
+    with (
+        patch("kindle_cap.pdf.img2pdf.convert", side_effect=enospc),
+        pytest.raises(PdfBuildError) as exc_info,
+    ):
+        build_pdf([p], out)
+
+    assert str(tmp_path) in str(exc_info.value)
+
+
+def test_build_pdf_reraises_non_enospc_oserror(tmp_path: Path) -> None:
+    """ENOSPC 以外の OSError は PdfBuildError に変換せず原例外を raise."""
+    p = _make_rgb_png(tmp_path / "page_001.png")
+    out = tmp_path / "out.pdf"
+
+    other = OSError(errno.EACCES, "Permission denied")
+    with (
+        patch("kindle_cap.pdf.img2pdf.convert", side_effect=other),
+        pytest.raises(OSError) as exc_info,
+    ):
+        build_pdf([p], out)
+
+    assert not isinstance(exc_info.value, PdfBuildError)
+    assert exc_info.value.errno == errno.EACCES
+
+
+def test_build_pdf_removes_partial_pdf_on_other_oserror(tmp_path: Path) -> None:
+    """ENOSPC 以外の OSError でも部分書き込み PDF は削除される."""
+    p = _make_rgb_png(tmp_path / "page_001.png")
+    out = tmp_path / "out.pdf"
+
+    other = OSError(errno.EIO, "I/O error")
+    with patch("kindle_cap.pdf.img2pdf.convert", side_effect=other), pytest.raises(OSError):
+        build_pdf([p], out)
+
+    assert not out.exists(), "原例外 OSError でも部分 PDF は削除する"

@@ -6,6 +6,7 @@ from typer.testing import CliRunner
 
 from kindle_cap.cli import capture, rebuild_pdf
 from kindle_cap.config import Direction
+from kindle_cap.pdf import PdfBuildError
 
 runner = CliRunner()
 
@@ -169,6 +170,43 @@ def test_rebuild_pdf_missing_dir_exits_nonzero(tmp_path: Path) -> None:
     app = _make_app(rebuild_pdf)
     result = runner.invoke(app, [str(missing)])
     assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------------------
+# PdfBuildError (ディスク容量不足) のハンドリング
+# ---------------------------------------------------------------------------
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_pdf_build_error_exits_nonzero_with_message(
+    mock_run: MagicMock, tmp_path: Path
+) -> None:
+    """PDF 生成が ENOSPC で失敗したら exit 1 + 説明的メッセージを stderr に出す."""
+    mock_run.side_effect = PdfBuildError("ディスク容量不足で PDF を作成できませんでした。")
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+    )
+    assert result.exit_code != 0
+    assert "ディスク容量不足" in result.output
+
+
+@patch("kindle_cap.cli.build_pdf")
+def test_rebuild_pdf_build_error_exits_nonzero_with_message(
+    mock_build: MagicMock, tmp_path: Path
+) -> None:
+    """rebuild_pdf でも ENOSPC は exit 1 + 説明的メッセージ."""
+    mock_build.side_effect = PdfBuildError("ディスク容量不足で PDF を作成できませんでした。")
+    book = tmp_path / "my-book"
+    book.mkdir()
+    (book / "page_001.png").write_bytes(b"a")
+
+    app = _make_app(rebuild_pdf)
+    result = runner.invoke(app, [str(book)])
+
+    assert result.exit_code != 0
+    assert "ディスク容量不足" in result.output
 
 
 # ---------------------------------------------------------------------------

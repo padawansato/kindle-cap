@@ -9,6 +9,11 @@
 - `--auto-direction`：表紙起点で試写し、ページ綴じ方向（rtl/ltr）を自動判定。試写 3 枚は本番に流用するため重複撮影しない（issue #15）
 - 開発者向けドキュメント（`CHANGELOG.md`、`CONTRIBUTING.md`）
 - GitHub の Issue / Pull Request テンプレート（`.github/`）
+- `kindle_cap.pdf.PdfBuildError` 例外：`build_pdf` がディスク容量不足など予測可能な要因で失敗したことを表す
+
+### Fixed
+
+- ディスク容量不足 (`ENOSPC`) で PDF 生成が失敗したときに生 traceback を露出していたのを改修。`PdfBuildError` を raise し、CLI で日本語の説明的メッセージ + exit 1 で終了する。部分書き込みされた PDF は削除し、PNG は保持して `kindle-cap-pdf` で再生成可能 (issue #19)
 
 ## [0.1.0] - 2026-04-25
 
