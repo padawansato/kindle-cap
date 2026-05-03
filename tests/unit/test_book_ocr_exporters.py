@@ -1,7 +1,8 @@
-"""book_ocr.exporters の純粋関数テスト (TDD red)."""
+"""book_ocr.exporters の純粋関数テスト."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -19,16 +20,6 @@ def _make_page(
         png_path=out_dir / f"page_{n:03d}.png",
         markdown=markdown,
         ocr_engine="yomitoku",
-    )
-
-
-def _make_meta(page_count: int = 2) -> BookMetadata:
-    return BookMetadata(
-        title="my-book",
-        page_count=page_count,
-        captured_at=datetime(2026, 4, 28, 21, 0, 0, tzinfo=UTC),
-        ocr_engine="yomitoku",
-        output_dir=Path("/tmp/output/my-book"),
     )
 
 
@@ -82,21 +73,23 @@ class TestRenderBookMd:
 
 
 class TestRenderIndex:
-    def test_top_level_fields(self) -> None:
-        meta = _make_meta()
+    def test_top_level_fields(self, make_meta: Callable[..., BookMetadata]) -> None:
+        meta = make_meta()
         pages = [_make_page(1), _make_page(2)]
         result = render_index(meta, pages)
         assert result["title"] == "my-book"
         assert result["page_count"] == 2
         assert result["ocr_engine"] == "yomitoku"
 
-    def test_captured_at_is_iso8601(self) -> None:
-        meta = _make_meta()
+    def test_captured_at_is_iso8601(self, make_meta: Callable[..., BookMetadata]) -> None:
+        meta = make_meta()
         result = render_index(meta, [])
         assert result["captured_at"] == "2026-04-28T21:00:00+00:00"
 
-    def test_pages_entries_have_relative_paths(self) -> None:
-        meta = _make_meta()
+    def test_pages_entries_have_relative_paths(
+        self, make_meta: Callable[..., BookMetadata]
+    ) -> None:
+        meta = make_meta()
         pages = [_make_page(1), _make_page(2)]
         result = render_index(meta, pages)
         assert result["pages"] == [
@@ -104,14 +97,16 @@ class TestRenderIndex:
             {"n": 2, "png": "page_002.png", "md": "pages/page_002.md"},
         ]
 
-    def test_pages_zero_padding_at_three_digits(self) -> None:
-        meta = _make_meta(page_count=12)
+    def test_pages_zero_padding_at_three_digits(
+        self, make_meta: Callable[..., BookMetadata]
+    ) -> None:
+        meta = make_meta(page_count=12)
         pages = [_make_page(12)]
         result = render_index(meta, pages)
         assert result["pages"][0]["md"] == "pages/page_012.md"
 
-    def test_empty_pages_list(self) -> None:
-        meta = _make_meta(page_count=0)
+    def test_empty_pages_list(self, make_meta: Callable[..., BookMetadata]) -> None:
+        meta = make_meta(page_count=0)
         result = render_index(meta, [])
         assert result["pages"] == []
         assert result["page_count"] == 0

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -34,16 +34,6 @@ class FakeEngine:
         return [self._one(p) for p in pngs]
 
 
-def _make_meta(out_dir: Path, page_count: int = 2) -> BookMetadata:
-    return BookMetadata(
-        title="my-book",
-        page_count=page_count,
-        captured_at=datetime(2026, 4, 28, 21, 0, 0, tzinfo=UTC),
-        ocr_engine="fake",
-        output_dir=out_dir,
-    )
-
-
 class TestFakeEngineSatisfiesProtocol:
     def test_fake_engine_has_required_methods(self) -> None:
         """Protocol 適合は静的型 (mypy) で担保。実行時は duck typing で確認."""
@@ -54,8 +44,10 @@ class TestFakeEngineSatisfiesProtocol:
 
 
 class TestOrchestratorRun:
-    def test_returns_one_page_per_png(self, tmp_path: Path) -> None:
-        meta = _make_meta(tmp_path)
+    def test_returns_one_page_per_png(
+        self, tmp_path: Path, make_meta: Callable[..., BookMetadata]
+    ) -> None:
+        meta = make_meta(out_dir=tmp_path, ocr_engine="fake")
         pngs = [tmp_path / "page_001.png", tmp_path / "page_002.png"]
         engine = FakeEngine()
 
@@ -65,8 +57,10 @@ class TestOrchestratorRun:
         assert pages[0].page_number == 1
         assert pages[1].page_number == 2
 
-    def test_returned_pages_use_engine_name(self, tmp_path: Path) -> None:
-        meta = _make_meta(tmp_path)
+    def test_returned_pages_use_engine_name(
+        self, tmp_path: Path, make_meta: Callable[..., BookMetadata]
+    ) -> None:
+        meta = make_meta(out_dir=tmp_path, ocr_engine="fake")
         pngs = [tmp_path / "page_001.png"]
         engine = FakeEngine()
 
@@ -74,8 +68,10 @@ class TestOrchestratorRun:
 
         assert pages[0].ocr_engine == "fake"
 
-    def test_index_dict_matches_render_index(self, tmp_path: Path) -> None:
-        meta = _make_meta(tmp_path)
+    def test_index_dict_matches_render_index(
+        self, tmp_path: Path, make_meta: Callable[..., BookMetadata]
+    ) -> None:
+        meta = make_meta(out_dir=tmp_path, ocr_engine="fake")
         pngs = [tmp_path / "page_001.png", tmp_path / "page_002.png"]
         engine = FakeEngine()
 
@@ -86,8 +82,10 @@ class TestOrchestratorRun:
         assert index["pages"][0]["png"] == "page_001.png"
         assert index["pages"][1]["md"] == "pages/page_002.md"
 
-    def test_book_md_contains_all_page_markers(self, tmp_path: Path) -> None:
-        meta = _make_meta(tmp_path, page_count=3)
+    def test_book_md_contains_all_page_markers(
+        self, tmp_path: Path, make_meta: Callable[..., BookMetadata]
+    ) -> None:
+        meta = make_meta(out_dir=tmp_path, ocr_engine="fake", page_count=3)
         pngs = [tmp_path / f"page_{n:03d}.png" for n in (1, 2, 3)]
         engine = FakeEngine()
 
@@ -99,9 +97,11 @@ class TestOrchestratorRun:
         assert "OCR text for page 1" in book_md
         assert "OCR text for page 3" in book_md
 
-    def test_no_side_effects_on_disk(self, tmp_path: Path) -> None:
+    def test_no_side_effects_on_disk(
+        self, tmp_path: Path, make_meta: Callable[..., BookMetadata]
+    ) -> None:
         """orchestrator は副作用ゼロ。writer に書き込みを委譲する."""
-        meta = _make_meta(tmp_path)
+        meta = make_meta(out_dir=tmp_path, ocr_engine="fake")
         pngs = [tmp_path / "page_001.png"]
         engine = FakeEngine()
 
@@ -110,8 +110,10 @@ class TestOrchestratorRun:
         # output_dir 配下に何も書き込まれていないこと
         assert list(tmp_path.iterdir()) == []
 
-    def test_empty_png_paths_returns_empty_lists(self, tmp_path: Path) -> None:
-        meta = _make_meta(tmp_path, page_count=0)
+    def test_empty_png_paths_returns_empty_lists(
+        self, tmp_path: Path, make_meta: Callable[..., BookMetadata]
+    ) -> None:
+        meta = make_meta(out_dir=tmp_path, ocr_engine="fake", page_count=0)
         engine = FakeEngine()
 
         pages, index, book_md = orchestrator.run(engine, meta, [])
@@ -120,7 +122,9 @@ class TestOrchestratorRun:
         assert index["pages"] == []
         assert book_md == ""
 
-    def test_engine_run_batch_called_exactly_once(self, tmp_path: Path) -> None:
+    def test_engine_run_batch_called_exactly_once(
+        self, tmp_path: Path, make_meta: Callable[..., BookMetadata]
+    ) -> None:
         """run_batch が 1 回だけ呼ばれることを確認 (バッチ最適化を保証)."""
         call_count = 0
 
@@ -142,7 +146,7 @@ class TestOrchestratorRun:
                     for p in pngs
                 ]
 
-        meta = _make_meta(tmp_path)
+        meta = make_meta(out_dir=tmp_path, ocr_engine="fake")
         pngs = [tmp_path / "page_001.png", tmp_path / "page_002.png"]
         orchestrator.run(CountingFakeEngine(), meta, pngs)
 
@@ -150,7 +154,9 @@ class TestOrchestratorRun:
 
 
 class TestOrchestratorRunInputValidation:
-    def test_rejects_engine_returning_wrong_page_number(self, tmp_path: Path) -> None:
+    def test_rejects_engine_returning_wrong_page_number(
+        self, tmp_path: Path, make_meta: Callable[..., BookMetadata]
+    ) -> None:
         """engine が png ファイル名と一致しない page_number を返した場合の挙動.
 
         現状仕様: engine が返した PageText をそのまま使う。
@@ -174,7 +180,7 @@ class TestOrchestratorRunInputValidation:
                     for p in pngs
                 ]
 
-        meta = _make_meta(tmp_path)
+        meta = make_meta(out_dir=tmp_path, ocr_engine="fake")
         pngs = [tmp_path / "page_001.png", tmp_path / "page_002.png"]
 
         with pytest.raises(ValueError, match="duplicate"):
