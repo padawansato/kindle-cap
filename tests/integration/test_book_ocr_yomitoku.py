@@ -3,6 +3,8 @@
 @pytest.mark.live_ocr で gating。CI ではスキップ。ローカルで
 experiments/ocr-poc/.venv-yomitoku/bin/yomitoku が存在し、サンプル PNG が
 experiments/ocr-poc/samples-vertical/ にある場合のみ実行される。
+
+live_ocr 不要なユニットテストは tests/unit/test_book_ocr_engine.py にある (issue #22)。
 """
 
 from __future__ import annotations
@@ -13,7 +15,6 @@ from pathlib import Path
 import pytest
 
 from book_ocr.engines.yomitoku import YomiTokuEngine
-from book_ocr.protocols import OCREngine
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _POC_VENV_BIN = REPO_ROOT / "experiments" / "ocr-poc" / ".venv-yomitoku" / "bin" / "yomitoku"
@@ -21,11 +22,6 @@ _SAMPLE_PNG = REPO_ROOT / "experiments" / "ocr-poc" / "samples-vertical" / "page
 
 
 pytestmark = pytest.mark.live_ocr
-
-
-def test_engine_satisfies_protocol() -> None:
-    engine = YomiTokuEngine()
-    assert isinstance(engine, OCREngine)
 
 
 def test_run_batch_single_page(tmp_path: Path) -> None:
@@ -44,16 +40,3 @@ def test_run_batch_single_page(tmp_path: Path) -> None:
     assert pages[0].page_number == 1
     assert pages[0].ocr_engine == "yomitoku"
     assert pages[0].markdown.strip() != ""
-
-
-def test_run_batch_empty_returns_empty_list() -> None:
-    """空入力では subprocess を呼ばずに空リストを返す."""
-    engine = YomiTokuEngine()
-    assert engine.run_batch([]) == []
-
-
-def test_resolve_binary_raises_when_missing(tmp_path: Path) -> None:
-    bad_path = tmp_path / "does-not-exist"
-    engine = YomiTokuEngine(yomitoku_bin=bad_path)
-    with pytest.raises(FileNotFoundError, match="does not exist"):
-        engine.run_batch([Path("/tmp/page_001.png")])
