@@ -122,9 +122,7 @@ class TestChunkSizeOption:
         assert kwargs["chunk_size"] == 50
 
     @patch("book_ocr.cli.YomiTokuEngine")
-    def test_chunk_size_default_is_none(
-        self, mock_engine_cls: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_chunk_size_default_is_none(self, mock_engine_cls: MagicMock, tmp_path: Path) -> None:
         mock_engine = MagicMock()
         mock_engine.run_batch.return_value = []
         mock_engine.name = "yomitoku"
@@ -146,6 +144,4 @@ class TestChunkSizeOption:
         # 空 dir なので exit != 0 だが、--chunk-size 未知フラグエラーではないこと
         result = runner.invoke(app, [str(empty), "--chunk-size", "50"])
         assert result.exit_code != 0
-        assert "No page_*.png" in result.stdout or "No page_*.png" in (
-            result.stderr or ""
-        )
+        assert "No page_*.png" in result.stdout or "No page_*.png" in (result.stderr or "")

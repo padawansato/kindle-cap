@@ -21,9 +21,7 @@ import pytest
 from book_ocr.engines.yomitoku import YomiTokuEngine
 
 
-def _fake_yomitoku_subprocess(
-    cmd: list[str], **kwargs: Any
-) -> subprocess.CompletedProcess[str]:
+def _fake_yomitoku_subprocess(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
     """yomitoku 出力を模倣: cmd 引数から input/output ディレクトリを取り、
     入力 PNG ごとに `input_<stem>_p1.md` を output_dir に書き出す。"""
     input_dir = Path(cmd[1])
@@ -81,9 +79,7 @@ def test_resolve_binary_raises_when_missing(tmp_path: Path) -> None:
 
 
 @patch("book_ocr.engines.yomitoku.subprocess.run", side_effect=_fake_yomitoku_subprocess)
-def test_chunk_size_none_uses_single_subprocess_call(
-    mock_run: MagicMock, tmp_path: Path
-) -> None:
+def test_chunk_size_none_uses_single_subprocess_call(mock_run: MagicMock, tmp_path: Path) -> None:
     """default (chunk_size=None) では従来通り 1 回の subprocess.run。"""
     pngs = _make_pngs(tmp_path, 5)
     engine = YomiTokuEngine(yomitoku_bin=_fake_binary(tmp_path))
@@ -125,9 +121,7 @@ def test_chunk_size_splits_into_multiple_subprocess_calls(
 
 
 @patch("book_ocr.engines.yomitoku.subprocess.run", side_effect=_fake_yomitoku_subprocess)
-def test_chunk_size_exact_multiple_of_pngs(
-    mock_run: MagicMock, tmp_path: Path
-) -> None:
+def test_chunk_size_exact_multiple_of_pngs(mock_run: MagicMock, tmp_path: Path) -> None:
     """6 ページ + chunk_size=3 → 2 回の subprocess.run (3+3)。"""
     pngs = _make_pngs(tmp_path, 6)
     engine = YomiTokuEngine(yomitoku_bin=_fake_binary(tmp_path), chunk_size=3)
@@ -139,9 +133,7 @@ def test_chunk_size_exact_multiple_of_pngs(
 
 
 @patch("book_ocr.engines.yomitoku.subprocess.run", side_effect=_fake_yomitoku_subprocess)
-def test_chunk_size_uses_separate_tempdirs_per_chunk(
-    mock_run: MagicMock, tmp_path: Path
-) -> None:
+def test_chunk_size_uses_separate_tempdirs_per_chunk(mock_run: MagicMock, tmp_path: Path) -> None:
     """各チャンクで別 tempdir を使う (前チャンクの状態に影響されない)。"""
     pngs = _make_pngs(tmp_path, 4)
     engine = YomiTokuEngine(yomitoku_bin=_fake_binary(tmp_path), chunk_size=2)
@@ -178,9 +170,7 @@ def test_chunked_execution_propagates_first_chunk_failure(
         raise subprocess.TimeoutExpired(cmd, timeout=1.0)
 
     mock_run.side_effect = first_call_times_out
-    engine = YomiTokuEngine(
-        yomitoku_bin=_fake_binary(tmp_path), chunk_size=2, timeout_sec=1.0
-    )
+    engine = YomiTokuEngine(yomitoku_bin=_fake_binary(tmp_path), chunk_size=2, timeout_sec=1.0)
 
     with pytest.raises(RuntimeError, match="timeout"):
         engine.run_batch(pngs)
@@ -209,9 +199,7 @@ def test_chunked_execution_propagates_mid_chunk_failure(
     """
     pngs = _make_pngs(tmp_path, 5)
     mock_run.side_effect = _make_failure_after_n_calls(1)
-    engine = YomiTokuEngine(
-        yomitoku_bin=_fake_binary(tmp_path), chunk_size=2, timeout_sec=1.0
-    )
+    engine = YomiTokuEngine(yomitoku_bin=_fake_binary(tmp_path), chunk_size=2, timeout_sec=1.0)
 
     with pytest.raises(RuntimeError, match="timeout"):
         engine.run_batch(pngs)

@@ -37,9 +37,7 @@ class YomiTokuEngine:
 
     def __post_init__(self) -> None:
         if self.chunk_size is not None and self.chunk_size < 1:
-            raise ValueError(
-                f"chunk_size must be >= 1 or None, got {self.chunk_size}"
-            )
+            raise ValueError(f"chunk_size must be >= 1 or None, got {self.chunk_size}")
 
     @property
     def name(self) -> str:
