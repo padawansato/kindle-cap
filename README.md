@@ -152,12 +152,15 @@ output/my-book.pdf                # 既存。視覚確認用
 | `--reading-order auto\|left2right\|top2bottom\|right2left` | `auto` | 読み順（自動検出推奨） |
 | `--ignore-meta / --no-ignore-meta` | `--ignore-meta` | Kindle のヘッダー/フッターを除外 |
 | `--out PATH` | `<book_dir>` | 出力先（省略時は book_dir に書き戻す） |
+| `--chunk-size N` | None | ページを N 枚ずつ分割して OCR (issue #36)。巨大本で timeout 回避＆スケール改善 |
 
 #### 性能の目安（Apple Silicon MPS）
 
-- 1 ページあたり約 7〜9 秒
-- 200 ページ本: 約 26 分 / 500 ページ本: 約 64 分
+- 1 ページあたり約 7〜9 秒（小規模、`--chunk-size` 不使用）
+- バッチサイズが大きくなると per-page 時間が悪化（10p: 13s/p → 50p: 19s/p）。**100 ページ超は `--chunk-size 50` 推奨**
+- 200 ページ本（chunked）: 約 65 分 / 500 ページ本（chunked）: 約 160 分
 - 縦書き・横書きどちらも対応
+- yomitoku の `subprocess.run(timeout=1800s)` で各 chunk が中断されるため、`--chunk-size 50` だと 1 chunk あたり ~16 分で安全マージン内
 
 詳細な PoC レポートは [`docs/ocr-bench/2026-04-28.md`](docs/ocr-bench/2026-04-28.md) を参照。
 

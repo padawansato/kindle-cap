@@ -21,6 +21,7 @@ def run_ocr_pipeline(
     ignore_meta: bool = True,
     out: Path | None = None,
     engine: OCREngine | None = None,
+    chunk_size: int | None = None,
 ) -> Path:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を出力する.
 
@@ -40,6 +41,7 @@ def run_ocr_pipeline(
         device=device,
         reading_order=reading_order,
         ignore_meta=ignore_meta,
+        chunk_size=chunk_size,
     )
     meta = BookMetadata(
         title=title,
@@ -83,6 +85,14 @@ def ocr(
     out: Path | None = typer.Option(
         None, "--out", help="出力先ディレクトリ (省略時は book_dir に書き戻す)"
     ),
+    chunk_size: int | None = typer.Option(
+        None,
+        "--chunk-size",
+        help=(
+            "ページを N 枚ずつ分割して OCR (issue #36)。"
+            "巨大本で timeout 回避と線形スケール改善。省略時は全 PNG を 1 subprocess。"
+        ),
+    ),
 ) -> None:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を生成する."""
     try:
@@ -93,6 +103,7 @@ def ocr(
             reading_order=reading_order,
             ignore_meta=ignore_meta,
             out=out,
+            chunk_size=chunk_size,
         )
     except FileNotFoundError as e:
         typer.echo(str(e), err=True)
