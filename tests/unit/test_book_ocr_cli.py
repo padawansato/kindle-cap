@@ -207,6 +207,87 @@ class TestTimeoutSecOption:
         assert "No page_*.png" in result.stdout or "No page_*.png" in (result.stderr or "")
 
 
+class TestPageRangeOption:
+    """issue #39: --start-page / --end-page で範囲指定。"""
+
+    def test_start_page_skips_earlier_pages(self, tmp_path: Path) -> None:
+        book = _make_book_dir(tmp_path, n_pages=5)
+        run_ocr_pipeline(book_dir=book, engine=FakeEngine(), start_page=3)
+
+        # page_003 〜 page_005 のみが OCR される
+        assert (book / "pages" / "page_003.md").exists()
+        assert (book / "pages" / "page_004.md").exists()
+        assert (book / "pages" / "page_005.md").exists()
+        assert not (book / "pages" / "page_001.md").exists()
+        assert not (book / "pages" / "page_002.md").exists()
+
+    def test_end_page_truncates_to_upper_bound(self, tmp_path: Path) -> None:
+        book = _make_book_dir(tmp_path, n_pages=5)
+        run_ocr_pipeline(book_dir=book, engine=FakeEngine(), end_page=2)
+
+        assert (book / "pages" / "page_001.md").exists()
+        assert (book / "pages" / "page_002.md").exists()
+        assert not (book / "pages" / "page_003.md").exists()
+
+    def test_both_start_and_end_pages(self, tmp_path: Path) -> None:
+        book = _make_book_dir(tmp_path, n_pages=5)
+        run_ocr_pipeline(book_dir=book, engine=FakeEngine(), start_page=2, end_page=4)
+
+        assert not (book / "pages" / "page_001.md").exists()
+        assert (book / "pages" / "page_002.md").exists()
+        assert (book / "pages" / "page_003.md").exists()
+        assert (book / "pages" / "page_004.md").exists()
+        assert not (book / "pages" / "page_005.md").exists()
+
+    def test_start_page_inclusive(self, tmp_path: Path) -> None:
+        """start_page=N を指定すると、ちょうど page_N が含まれる (inclusive)。"""
+        book = _make_book_dir(tmp_path, n_pages=3)
+        run_ocr_pipeline(book_dir=book, engine=FakeEngine(), start_page=2)
+
+        assert (book / "pages" / "page_002.md").exists()
+        assert (book / "pages" / "page_003.md").exists()
+
+    def test_end_page_inclusive(self, tmp_path: Path) -> None:
+        """end_page=N を指定すると、page_N も含まれる (inclusive)。"""
+        book = _make_book_dir(tmp_path, n_pages=3)
+        run_ocr_pipeline(book_dir=book, engine=FakeEngine(), end_page=2)
+
+        assert (book / "pages" / "page_002.md").exists()
+        assert not (book / "pages" / "page_003.md").exists()
+
+    def test_start_page_zero_rejected(self, tmp_path: Path) -> None:
+        book = _make_book_dir(tmp_path, n_pages=3)
+        with pytest.raises(ValueError, match="start_page"):
+            run_ocr_pipeline(book_dir=book, engine=FakeEngine(), start_page=0)
+
+    def test_start_page_greater_than_end_page_rejected(self, tmp_path: Path) -> None:
+        book = _make_book_dir(tmp_path, n_pages=5)
+        with pytest.raises(ValueError, match=r"end_page.*>=.*start_page"):
+            run_ocr_pipeline(book_dir=book, engine=FakeEngine(), start_page=4, end_page=2)
+
+    def test_range_with_no_pages_in_dir_raises(self, tmp_path: Path) -> None:
+        book = _make_book_dir(tmp_path, n_pages=3)
+        with pytest.raises(FileNotFoundError, match="No page_"):
+            run_ocr_pipeline(book_dir=book, engine=FakeEngine(), start_page=10)
+
+    def test_index_page_count_reflects_range(self, tmp_path: Path) -> None:
+        book = _make_book_dir(tmp_path, n_pages=5)
+        run_ocr_pipeline(book_dir=book, engine=FakeEngine(), start_page=2, end_page=4)
+
+        data = json.loads((book / "index.json").read_text(encoding="utf-8"))
+        assert data["page_count"] == 3  # 2,3,4 の 3 ページ
+
+    def test_cli_start_end_page_flags_parse(self, tmp_path: Path) -> None:
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        app = typer.Typer()
+        app.command()(cli.ocr)
+        runner = CliRunner()
+        result = runner.invoke(app, [str(empty), "--start-page", "5", "--end-page", "10"])
+        assert result.exit_code != 0  # No page_*.png なのでエラー終了
+        assert "No page_*.png" in result.stdout or "No page_*.png" in (result.stderr or "")
+
+
 class TestIndexMetadataExtension:
     """issue #40: index.json に reproducibility メタが書き込まれること。"""
 

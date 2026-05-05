@@ -19,6 +19,7 @@
   - `ocr_settings`：`device`, `reading_order`, `ignore_meta`, `chunk_size`, `timeout_sec` の設定値
   - `ocr_runtime`：`started_at`, `finished_at`, `duration_sec`（`time.perf_counter()` 由来）
 - `OCREngine` Protocol に `version: str` と `settings: dict[str, Any]` プロパティを追加（issue #40）
+- `book-ocr --start-page N` / `--end-page M` CLI オプション：1-indexed inclusive で OCR 対象範囲を絞れる。失敗後の局所再走 (chunked 実行と組み合わせた retry や、巨大本の段階的処理) に有効（issue #39）
 
 ### Changed
 
