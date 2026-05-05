@@ -432,12 +432,12 @@ source = { editable = "." }
 dependencies = [
     { name = "img2pdf" },
     { name = "pillow" },
+    { name = "tqdm" },
     { name = "typer" },
 ]
 
 [package.optional-dependencies]
 ocr = [
-    { name = "tqdm" },
     { name = "yomitoku" },
 ]
 
@@ -454,7 +454,7 @@ dev = [
 requires-dist = [
     { name = "img2pdf", specifier = ">=0.5" },
     { name = "pillow", specifier = ">=10.0" },
-    { name = "tqdm", marker = "extra == 'ocr'", specifier = ">=4.0" },
+    { name = "tqdm", specifier = ">=4.0" },
     { name = "typer", specifier = ">=0.16" },
     { name = "yomitoku", marker = "extra == 'ocr'", specifier = ">=0.4" },
 ]
