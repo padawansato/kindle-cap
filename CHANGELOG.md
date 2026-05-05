@@ -12,6 +12,7 @@
 - `kindle_cap.pdf.PdfBuildError` 例外：`build_pdf` がディスク容量不足など予測可能な要因で失敗したことを表す
 - `book_ocr.engines.yomitoku.YomiTokuEngine.timeout_sec`（デフォルト 1800 秒）：yomitoku がハングしたときに `RuntimeError` で抜けるための上限時間
 - `book_ocr.cli.run_ocr_pipeline(book_dir, ..., engine=...)`：CLI から分離した OCR パイプライン公開関数。テストや組み込み利用で `engine` を注入できる
+- `book_ocr.engines.yomitoku.YomiTokuEngine.chunk_size` および `book-ocr --chunk-size N` CLI オプション：ページを N 枚ずつ分割して **複数 subprocess で順次 OCR**。巨大本での timeout 回避と、batch size 増大に伴う per-page 時間悪化（10p: 13s/p → 50p: 19s/p の実測差）を回避する。`None`（デフォルト）は従来通り全 PNG を 1 subprocess に渡す（issue #36）
 
 ### Changed
 

@@ -1,4 +1,14 @@
-"""YomiTokuEngine — yomitoku CLI を 1 回の subprocess で叩く batch 実装."""
+"""YomiTokuEngine — yomitoku CLI を subprocess で叩く batch 実装.
+
+`chunk_size` を指定するとページを分割して **複数 subprocess** で順次処理する
+(issue #36)。チャンク化により:
+
+- 1 チャンクが timeout に収まる → 巨大本でも処理可能
+- per-page 実行時間が batch size に比例して悪化する問題 (10p: 13s/p → 50p: 19s/p) を回避
+- 各チャンク独立 tempdir で I/O 競合なし
+
+`chunk_size=None` (default) は従来通り全 PNG を 1 subprocess に渡す挙動。
+"""
 
 from __future__ import annotations
 
@@ -22,6 +32,12 @@ class YomiTokuEngine:
     yomitoku_bin: Path | None = None  # 隔離 venv のバイナリを指す用
     # 1 ページ ~8 秒 × 200 ページ + 余裕で 30 分。巨大本では呼び出し側で延長
     timeout_sec: float = 1800.0
+    # None なら全 PNG を 1 subprocess、int なら chunk_size 単位で分割実行 (issue #36)
+    chunk_size: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.chunk_size is not None and self.chunk_size < 1:
+            raise ValueError(f"chunk_size must be >= 1 or None, got {self.chunk_size}")
 
     @property
     def name(self) -> str:
@@ -32,7 +48,14 @@ class YomiTokuEngine:
             return []
 
         binary = self._resolve_binary()
+        chunks = _split_into_chunks(pngs, self.chunk_size)
 
+        all_pages: list[PageText] = []
+        for chunk in chunks:
+            all_pages.extend(self._run_one_subprocess(binary, chunk))
+        return all_pages
+
+    def _run_one_subprocess(self, binary: Path, pngs: list[Path]) -> list[PageText]:
         with tempfile.TemporaryDirectory() as tmp_str:
             tmp_dir = Path(tmp_str)
             input_dir = tmp_dir / _INPUT_DIR_NAME
@@ -88,6 +111,13 @@ class YomiTokuEngine:
                 f"{_BINARY_NAME} not found in PATH. Install with: uv pip install yomitoku"
             )
         return Path(path)
+
+
+def _split_into_chunks(pngs: list[Path], chunk_size: int | None) -> list[list[Path]]:
+    """`chunk_size` ごとに pngs を分割。`None` または `>= len(pngs)` なら 1 チャンクのまま。"""
+    if chunk_size is None or chunk_size >= len(pngs):
+        return [pngs]
+    return [pngs[i : i + chunk_size] for i in range(0, len(pngs), chunk_size)]
 
 
 def _ensure_yomitoku_succeeded(returncode: int, stdout: str, stderr: str) -> None:

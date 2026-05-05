@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
@@ -100,3 +101,47 @@ class TestCliInvocation:
         runner = CliRunner()
         result = runner.invoke(app, [str(missing)])
         assert result.exit_code != 0
+
+
+class TestChunkSizeOption:
+    """--chunk-size CLI フラグが YomiTokuEngine に伝搬すること (issue #36)."""
+
+    @patch("book_ocr.cli.YomiTokuEngine")
+    def test_chunk_size_propagates_to_engine(
+        self, mock_engine_cls: MagicMock, tmp_path: Path
+    ) -> None:
+        mock_engine = MagicMock()
+        mock_engine.run_batch.return_value = []
+        mock_engine.name = "yomitoku"
+        mock_engine_cls.return_value = mock_engine
+        book = _make_book_dir(tmp_path, n_pages=1)
+
+        run_ocr_pipeline(book_dir=book, chunk_size=50)
+
+        kwargs = mock_engine_cls.call_args.kwargs
+        assert kwargs["chunk_size"] == 50
+
+    @patch("book_ocr.cli.YomiTokuEngine")
+    def test_chunk_size_default_is_none(self, mock_engine_cls: MagicMock, tmp_path: Path) -> None:
+        mock_engine = MagicMock()
+        mock_engine.run_batch.return_value = []
+        mock_engine.name = "yomitoku"
+        mock_engine_cls.return_value = mock_engine
+        book = _make_book_dir(tmp_path, n_pages=1)
+
+        run_ocr_pipeline(book_dir=book)
+
+        kwargs = mock_engine_cls.call_args.kwargs
+        assert kwargs["chunk_size"] is None
+
+    def test_cli_chunk_size_flag_parses(self, tmp_path: Path) -> None:
+        """--chunk-size N が CLI から typer.Option で受け取れること (smoke)."""
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        app = typer.Typer()
+        app.command()(cli.ocr)
+        runner = CliRunner()
+        # 空 dir なので exit != 0 だが、--chunk-size 未知フラグエラーではないこと
+        result = runner.invoke(app, [str(empty), "--chunk-size", "50"])
+        assert result.exit_code != 0
+        assert "No page_*.png" in result.stdout or "No page_*.png" in (result.stderr or "")
