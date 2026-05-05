@@ -22,6 +22,7 @@ dependencies = [
     "typer>=0.16",
     "img2pdf>=0.5",
     "pillow>=10.0",
+    "tqdm>=4.0",
 ]
 
 [project.optional-dependencies]
@@ -93,6 +94,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["yomitoku", "yomitoku.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tqdm", "tqdm.*"]
 ignore_missing_imports = true
 
 [build-system]
