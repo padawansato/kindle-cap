@@ -26,17 +26,31 @@ def run_ocr_pipeline(
     engine: OCREngine | None = None,
     chunk_size: int | None = None,
     timeout_sec: float = 1800.0,
+    start_page: int = 1,
+    end_page: int | None = None,
 ) -> Path:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を出力する.
 
     `engine=None` のときは `YomiTokuEngine` を生成する。テストでは FakeEngine 等を渡す。
 
+    `start_page` / `end_page` (1-indexed inclusive) で対象範囲を絞れる (issue #39)。
+    ファイル名 `page_NNN.png` の NNN 部分でフィルタする。
+
     Returns:
         生成された book Markdown ファイルのパス。
     """
-    pngs = sorted(book_dir.glob("page_*.png"))
+    if start_page < 1:
+        raise ValueError(f"start_page must be >= 1, got {start_page}")
+    if end_page is not None and end_page < start_page:
+        raise ValueError(f"end_page ({end_page}) must be >= start_page ({start_page})")
+
+    all_pngs = sorted(book_dir.glob("page_*.png"))
+    pngs = [p for p in all_pngs if start_page <= _parse_page_number(p) <= (end_page or 10**9)]
     if not pngs:
-        raise FileNotFoundError(f"No page_*.png in {book_dir}")
+        raise FileNotFoundError(
+            f"No page_*.png in {book_dir} for range "
+            f"[{start_page}, {end_page if end_page is not None else 'end'}]"
+        )
 
     title = name or book_dir.name
     out_dir = out or book_dir
@@ -122,6 +136,16 @@ def ocr(
             "chunked 実行時は 1 chunk あたりの上限。巨大本では延長を検討。"
         ),
     ),
+    start_page: int = typer.Option(
+        1,
+        "--start-page",
+        help="OCR 開始ページ番号 (1-indexed inclusive、issue #39)。",
+    ),
+    end_page: int | None = typer.Option(
+        None,
+        "--end-page",
+        help="OCR 終了ページ番号 (1-indexed inclusive、省略時は最後まで、issue #39)。",
+    ),
 ) -> None:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を生成する."""
     try:
@@ -134,11 +158,21 @@ def ocr(
             out=out,
             chunk_size=chunk_size,
             timeout_sec=timeout_sec,
+            start_page=start_page,
+            end_page=end_page,
         )
     except FileNotFoundError as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1) from e
+    except ValueError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
     typer.echo(f"OCR complete: {out_path}")
+
+
+def _parse_page_number(p: Path) -> int:
+    """`page_NNN.png` から NNN を取り出す。issue #39 の範囲フィルタで使う。"""
+    return int(p.stem.split("_")[-1])
 
 
 def run_ocr() -> None:
