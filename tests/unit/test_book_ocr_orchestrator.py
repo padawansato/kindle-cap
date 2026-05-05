@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -20,6 +21,14 @@ class FakeEngine:
     @property
     def name(self) -> str:
         return "fake"
+
+    @property
+    def version(self) -> str:
+        return "0.0.0-fake"
+
+    @property
+    def settings(self) -> dict[str, Any]:
+        return {"engine": "fake"}
 
     def _one(self, png: Path) -> PageText:
         n = int(png.stem.split("_")[-1])  # page_001.png -> 1
@@ -133,6 +142,14 @@ class TestOrchestratorRun:
             def name(self) -> str:
                 return "fake"
 
+            @property
+            def version(self) -> str:
+                return "0.0.0-fake"
+
+            @property
+            def settings(self) -> dict[str, Any]:
+                return {}
+
             def run_batch(self, pngs: list[Path]) -> list[PageText]:
                 nonlocal call_count
                 call_count += 1
@@ -167,6 +184,14 @@ class TestOrchestratorRunInputValidation:
             @property
             def name(self) -> str:
                 return "broken"
+
+            @property
+            def version(self) -> str:
+                return "0.0.0-broken"
+
+            @property
+            def settings(self) -> dict[str, Any]:
+                return {}
 
             def run_batch(self, pngs: list[Path]) -> list[PageText]:
                 # png のファイル名に関わらず常に page_number=1 を返す

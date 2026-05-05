@@ -124,3 +124,34 @@ class TestBookMetadata:
                 ocr_engine="",
                 output_dir=Path("/tmp"),
             )
+
+    # -----------------------------------------------------------------------
+    # issue #40: optional reproducibility metadata
+    # -----------------------------------------------------------------------
+
+    def test_optional_metadata_defaults_to_none(self) -> None:
+        meta = BookMetadata(
+            title="my-book",
+            page_count=1,
+            captured_at=datetime(2026, 4, 28, tzinfo=UTC),
+            ocr_engine="yomitoku",
+            output_dir=Path("/tmp"),
+        )
+        assert meta.ocr_engine_version is None
+        assert meta.ocr_settings is None
+        assert meta.ocr_runtime is None
+
+    def test_optional_metadata_accepts_values(self) -> None:
+        meta = BookMetadata(
+            title="my-book",
+            page_count=1,
+            captured_at=datetime(2026, 4, 28, tzinfo=UTC),
+            ocr_engine="yomitoku",
+            output_dir=Path("/tmp"),
+            ocr_engine_version="0.12.0",
+            ocr_settings={"device": "mps", "reading_order": "auto"},
+            ocr_runtime={"duration_sec": 12.5},
+        )
+        assert meta.ocr_engine_version == "0.12.0"
+        assert meta.ocr_settings == {"device": "mps", "reading_order": "auto"}
+        assert meta.ocr_runtime == {"duration_sec": 12.5}

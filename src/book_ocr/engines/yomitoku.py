@@ -12,11 +12,13 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from book_ocr.models import PageText
 
@@ -42,6 +44,27 @@ class YomiTokuEngine:
     @property
     def name(self) -> str:
         return "yomitoku"
+
+    @property
+    def version(self) -> str:
+        """インストールされた yomitoku のバージョン (issue #40)。
+
+        未インストール / 取得失敗時は `"unknown"` を返す。"""
+        try:
+            return importlib.metadata.version("yomitoku")
+        except importlib.metadata.PackageNotFoundError:
+            return "unknown"
+
+    @property
+    def settings(self) -> dict[str, Any]:
+        """index.json に記録する OCR 設定 (issue #40)。"""
+        return {
+            "device": self.device,
+            "reading_order": self.reading_order,
+            "ignore_meta": self.ignore_meta,
+            "chunk_size": self.chunk_size,
+            "timeout_sec": self.timeout_sec,
+        }
 
     def run_batch(self, pngs: list[Path]) -> list[PageText]:
         if not pngs:
