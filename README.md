@@ -153,6 +153,7 @@ output/my-book.pdf                # 既存。視覚確認用
 | `--ignore-meta / --no-ignore-meta` | `--ignore-meta` | Kindle のヘッダー/フッターを除外 |
 | `--out PATH` | `<book_dir>` | 出力先（省略時は book_dir に書き戻す） |
 | `--chunk-size N` | None | ページを N 枚ずつ分割して OCR (issue #36)。巨大本で timeout 回避＆スケール改善 |
+| `--timeout-sec N` | `1800.0` | yomitoku subprocess 1 回の timeout (秒、issue #37)。chunked 実行時は 1 chunk あたり |
 
 #### 性能の目安（Apple Silicon MPS）
 

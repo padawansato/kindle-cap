@@ -13,6 +13,7 @@
 - `book_ocr.engines.yomitoku.YomiTokuEngine.timeout_sec`（デフォルト 1800 秒）：yomitoku がハングしたときに `RuntimeError` で抜けるための上限時間
 - `book_ocr.cli.run_ocr_pipeline(book_dir, ..., engine=...)`：CLI から分離した OCR パイプライン公開関数。テストや組み込み利用で `engine` を注入できる
 - `book_ocr.engines.yomitoku.YomiTokuEngine.chunk_size` および `book-ocr --chunk-size N` CLI オプション：ページを N 枚ずつ分割して **複数 subprocess で順次 OCR**。巨大本での timeout 回避と、batch size 増大に伴う per-page 時間悪化（10p: 13s/p → 50p: 19s/p の実測差）を回避する。`None`（デフォルト）は従来通り全 PNG を 1 subprocess に渡す（issue #36）
+- `book-ocr --timeout-sec N` CLI オプション：yomitoku subprocess 1 回の timeout を秒単位で指定（デフォルト 1800.0）。chunked 実行時は 1 chunk あたりの上限。巨大本で延長が必要なケースに対応（issue #37）
 
 ### Changed
 

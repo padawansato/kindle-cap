@@ -145,3 +145,46 @@ class TestChunkSizeOption:
         result = runner.invoke(app, [str(empty), "--chunk-size", "50"])
         assert result.exit_code != 0
         assert "No page_*.png" in result.stdout or "No page_*.png" in (result.stderr or "")
+
+
+class TestTimeoutSecOption:
+    """--timeout-sec CLI フラグが YomiTokuEngine に伝搬すること (issue #37)."""
+
+    @patch("book_ocr.cli.YomiTokuEngine")
+    def test_timeout_sec_propagates_to_engine(
+        self, mock_engine_cls: MagicMock, tmp_path: Path
+    ) -> None:
+        mock_engine = MagicMock()
+        mock_engine.run_batch.return_value = []
+        mock_engine.name = "yomitoku"
+        mock_engine_cls.return_value = mock_engine
+        book = _make_book_dir(tmp_path, n_pages=1)
+
+        run_ocr_pipeline(book_dir=book, timeout_sec=7200.0)
+
+        kwargs = mock_engine_cls.call_args.kwargs
+        assert kwargs["timeout_sec"] == 7200.0
+
+    @patch("book_ocr.cli.YomiTokuEngine")
+    def test_timeout_sec_default_is_1800(self, mock_engine_cls: MagicMock, tmp_path: Path) -> None:
+        mock_engine = MagicMock()
+        mock_engine.run_batch.return_value = []
+        mock_engine.name = "yomitoku"
+        mock_engine_cls.return_value = mock_engine
+        book = _make_book_dir(tmp_path, n_pages=1)
+
+        run_ocr_pipeline(book_dir=book)
+
+        kwargs = mock_engine_cls.call_args.kwargs
+        assert kwargs["timeout_sec"] == 1800.0
+
+    def test_cli_timeout_sec_flag_parses(self, tmp_path: Path) -> None:
+        """--timeout-sec N が CLI から typer.Option で受け取れること (smoke)。"""
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        app = typer.Typer()
+        app.command()(cli.ocr)
+        runner = CliRunner()
+        result = runner.invoke(app, [str(empty), "--timeout-sec", "3600"])
+        assert result.exit_code != 0
+        assert "No page_*.png" in result.stdout or "No page_*.png" in (result.stderr or "")
