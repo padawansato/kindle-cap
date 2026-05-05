@@ -22,6 +22,7 @@
 - `book-ocr --start-page N` / `--end-page M` CLI オプション：1-indexed inclusive で OCR 対象範囲を絞れる。失敗後の局所再走 (chunked 実行と組み合わせた retry や、巨大本の段階的処理) に有効（issue #39）
 - `book-ocr --progress` / `--no-progress` CLI オプション + `YomiTokuEngine.progress`：chunked 実行時に `tqdm` で chunk 単位の進捗を stderr に表示。chunk 数 < 2 や非 tty 環境では自動的に無効化（issue #38）
 - `tqdm>=4.0` を base 依存に追加（chunked 進捗表示で必要、CI でも常時入手するため `[ocr]` extra ではなく base に置く）
+- `book-ocr --skip-existing` CLI オプション + `book_ocr.cli.run_ocr_pipeline(..., skip_existing=True)`：既存 `pages/page_NNN.md` があるページは OCR をスキップ。失敗後 chunk 単位 retry を高速化。空ファイルは missing 扱いで再 OCR される。既存 md 先頭の `<!-- page:NNN -->` プレフィクスは render_page_md と対称に剥がして PageText を再構成する（issue #41）
 
 ### Changed
 
