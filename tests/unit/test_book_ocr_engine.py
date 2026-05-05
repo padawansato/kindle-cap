@@ -204,3 +204,69 @@ def test_chunked_execution_propagates_mid_chunk_failure(
     with pytest.raises(RuntimeError, match="timeout"):
         engine.run_batch(pngs)
     assert mock_run.call_count == 2  # 1 success + 1 fail
+
+
+# ---------------------------------------------------------------------------
+# tqdm progress display (issue #38)
+# ---------------------------------------------------------------------------
+
+
+@patch("book_ocr.engines.yomitoku.tqdm")
+@patch("book_ocr.engines.yomitoku.subprocess.run", side_effect=_fake_yomitoku_subprocess)
+def test_tqdm_called_when_progress_true_and_chunked(
+    mock_run: MagicMock, mock_tqdm: MagicMock, tmp_path: Path
+) -> None:
+    """chunk 数 >= 2 かつ progress=True で tqdm を呼ぶ。"""
+    mock_tqdm.side_effect = lambda chunks, **kwargs: list(chunks)
+    pngs = _make_pngs(tmp_path, 5)
+    engine = YomiTokuEngine(yomitoku_bin=_fake_binary(tmp_path), chunk_size=2, progress=True)
+
+    engine.run_batch(pngs)
+
+    assert mock_tqdm.call_count == 1
+
+
+@patch("book_ocr.engines.yomitoku.tqdm")
+@patch("book_ocr.engines.yomitoku.subprocess.run", side_effect=_fake_yomitoku_subprocess)
+def test_tqdm_not_called_when_progress_false(
+    mock_run: MagicMock, mock_tqdm: MagicMock, tmp_path: Path
+) -> None:
+    """progress=False のとき tqdm を呼ばない。"""
+    pngs = _make_pngs(tmp_path, 5)
+    engine = YomiTokuEngine(yomitoku_bin=_fake_binary(tmp_path), chunk_size=2, progress=False)
+
+    engine.run_batch(pngs)
+
+    assert mock_tqdm.call_count == 0
+
+
+@patch("book_ocr.engines.yomitoku.tqdm")
+@patch("book_ocr.engines.yomitoku.subprocess.run", side_effect=_fake_yomitoku_subprocess)
+def test_tqdm_not_called_when_only_one_chunk(
+    mock_run: MagicMock, mock_tqdm: MagicMock, tmp_path: Path
+) -> None:
+    """chunk 数 == 1 のとき tqdm を呼ばない (進捗バーが意味を持たない)。"""
+    pngs = _make_pngs(tmp_path, 3)
+    # chunk_size 未指定 → 1 chunk
+    engine = YomiTokuEngine(yomitoku_bin=_fake_binary(tmp_path), progress=True)
+
+    engine.run_batch(pngs)
+
+    assert mock_tqdm.call_count == 0
+
+
+@patch("book_ocr.engines.yomitoku.tqdm")
+@patch("book_ocr.engines.yomitoku.subprocess.run", side_effect=_fake_yomitoku_subprocess)
+def test_tqdm_disable_kwarg_when_stderr_not_tty(
+    mock_run: MagicMock, mock_tqdm: MagicMock, tmp_path: Path
+) -> None:
+    """非 tty 環境では tqdm 呼び出し時に disable=True が渡される。"""
+    mock_tqdm.side_effect = lambda chunks, **kwargs: list(chunks)
+    pngs = _make_pngs(tmp_path, 4)
+    engine = YomiTokuEngine(yomitoku_bin=_fake_binary(tmp_path), chunk_size=2, progress=True)
+
+    engine.run_batch(pngs)
+
+    # pytest 環境では sys.stderr.isatty() == False のため disable=True
+    kwargs = mock_tqdm.call_args.kwargs
+    assert kwargs["disable"] is True

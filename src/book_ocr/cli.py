@@ -28,6 +28,7 @@ def run_ocr_pipeline(
     timeout_sec: float = 1800.0,
     start_page: int = 1,
     end_page: int | None = None,
+    progress: bool = True,
 ) -> Path:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を出力する.
 
@@ -61,6 +62,7 @@ def run_ocr_pipeline(
         ignore_meta=ignore_meta,
         chunk_size=chunk_size,
         timeout_sec=timeout_sec,
+        progress=progress,
     )
     captured_at = datetime.now(UTC)
     initial_meta = BookMetadata(
@@ -146,6 +148,14 @@ def ocr(
         "--end-page",
         help="OCR 終了ページ番号 (1-indexed inclusive、省略時は最後まで、issue #39)。",
     ),
+    progress: bool = typer.Option(
+        True,
+        "--progress/--no-progress",
+        help=(
+            "chunked 実行時に tqdm で chunk 単位の進捗を stderr に表示する (issue #38)。"
+            "非 tty 環境では自動的に無効化される。"
+        ),
+    ),
 ) -> None:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を生成する."""
     try:
@@ -160,6 +170,7 @@ def ocr(
             timeout_sec=timeout_sec,
             start_page=start_page,
             end_page=end_page,
+            progress=progress,
         )
     except FileNotFoundError as e:
         typer.echo(str(e), err=True)

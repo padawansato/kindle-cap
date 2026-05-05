@@ -288,6 +288,50 @@ class TestPageRangeOption:
         assert "No page_*.png" in result.stdout or "No page_*.png" in (result.stderr or "")
 
 
+class TestProgressOption:
+    """issue #38: --progress / --no-progress が YomiTokuEngine に伝搬する。"""
+
+    @patch("book_ocr.cli.YomiTokuEngine")
+    def test_progress_default_is_true(self, mock_engine_cls: MagicMock, tmp_path: Path) -> None:
+        mock_engine = MagicMock()
+        mock_engine.run_batch.return_value = []
+        mock_engine.name = "yomitoku"
+        mock_engine.version = "0.12.0"
+        mock_engine.settings = {"device": "mps"}
+        mock_engine_cls.return_value = mock_engine
+        book = _make_book_dir(tmp_path, n_pages=1)
+
+        run_ocr_pipeline(book_dir=book)
+
+        kwargs = mock_engine_cls.call_args.kwargs
+        assert kwargs["progress"] is True
+
+    @patch("book_ocr.cli.YomiTokuEngine")
+    def test_progress_false_propagates(self, mock_engine_cls: MagicMock, tmp_path: Path) -> None:
+        mock_engine = MagicMock()
+        mock_engine.run_batch.return_value = []
+        mock_engine.name = "yomitoku"
+        mock_engine.version = "0.12.0"
+        mock_engine.settings = {"device": "mps"}
+        mock_engine_cls.return_value = mock_engine
+        book = _make_book_dir(tmp_path, n_pages=1)
+
+        run_ocr_pipeline(book_dir=book, progress=False)
+
+        kwargs = mock_engine_cls.call_args.kwargs
+        assert kwargs["progress"] is False
+
+    def test_cli_no_progress_flag_parses(self, tmp_path: Path) -> None:
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        app = typer.Typer()
+        app.command()(cli.ocr)
+        runner = CliRunner()
+        result = runner.invoke(app, [str(empty), "--no-progress"])
+        assert result.exit_code != 0  # No page_*.png でエラー終了
+        assert "No page_*.png" in result.stdout or "No page_*.png" in (result.stderr or "")
+
+
 class TestIndexMetadataExtension:
     """issue #40: index.json に reproducibility メタが書き込まれること。"""
 

@@ -156,6 +156,7 @@ output/my-book.pdf                # 既存。視覚確認用
 | `--timeout-sec N` | `1800.0` | yomitoku subprocess 1 回の timeout (秒、issue #37)。chunked 実行時は 1 chunk あたり |
 | `--start-page N` | `1` | OCR 開始ページ番号 (1-indexed inclusive、issue #39) |
 | `--end-page M` | None | OCR 終了ページ番号 (1-indexed inclusive、省略時は最後まで、issue #39) |
+| `--progress / --no-progress` | `--progress` | chunked 実行時に tqdm で chunk 進捗を stderr に表示 (issue #38) |
 
 #### 性能の目安（Apple Silicon MPS）
 

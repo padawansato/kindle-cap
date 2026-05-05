@@ -8,6 +8,9 @@
 - 各チャンク独立 tempdir で I/O 競合なし
 
 `chunk_size=None` (default) は従来通り全 PNG を 1 subprocess に渡す挙動。
+
+`progress=True` (default) かつ chunk 数 >= 2 のとき、`tqdm` で chunk 単位の進捗を
+stderr に表示する (issue #38)。
 """
 
 from __future__ import annotations
@@ -15,10 +18,14 @@ from __future__ import annotations
 import importlib.metadata
 import shutil
 import subprocess
+import sys
 import tempfile
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from tqdm import tqdm
 
 from book_ocr.models import PageText
 
@@ -36,6 +43,8 @@ class YomiTokuEngine:
     timeout_sec: float = 1800.0
     # None なら全 PNG を 1 subprocess、int なら chunk_size 単位で分割実行 (issue #36)
     chunk_size: int | None = None
+    # chunked 実行時に tqdm で chunk 進捗を stderr に表示する (issue #38)
+    progress: bool = True
 
     def __post_init__(self) -> None:
         if self.chunk_size is not None and self.chunk_size < 1:
@@ -74,7 +83,8 @@ class YomiTokuEngine:
         chunks = _split_into_chunks(pngs, self.chunk_size)
 
         all_pages: list[PageText] = []
-        for chunk in chunks:
+        chunk_iter: Iterable[list[Path]] = _maybe_tqdm(chunks, enabled=self.progress)
+        for chunk in chunk_iter:
             all_pages.extend(self._run_one_subprocess(binary, chunk))
         return all_pages
 
@@ -141,6 +151,22 @@ def _split_into_chunks(pngs: list[Path], chunk_size: int | None) -> list[list[Pa
     if chunk_size is None or chunk_size >= len(pngs):
         return [pngs]
     return [pngs[i : i + chunk_size] for i in range(0, len(pngs), chunk_size)]
+
+
+def _maybe_tqdm(chunks: list[list[Path]], *, enabled: bool) -> Iterable[list[Path]]:
+    """chunk 数 >= 2 かつ enabled かつ stderr が tty のとき、tqdm でラップする (issue #38)。
+
+    1 chunk のときは進捗バーが意味を持たないため bare iterable を返す。
+    CI など非 tty の場合は disable=True で tqdm を no-op にする。"""
+    if len(chunks) < 2 or not enabled:
+        return chunks
+    wrapped: Iterable[list[Path]] = tqdm(
+        chunks,
+        desc="OCR (chunks)",
+        unit="chunk",
+        disable=not sys.stderr.isatty(),
+    )
+    return wrapped
 
 
 def _ensure_yomitoku_succeeded(returncode: int, stdout: str, stderr: str) -> None:
