@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -9,6 +11,7 @@ import typer
 
 from book_ocr import orchestrator, writer
 from book_ocr.engines.yomitoku import YomiTokuEngine
+from book_ocr.exporters.json_index import render_index
 from book_ocr.models import BookMetadata
 from book_ocr.protocols import OCREngine
 
@@ -45,15 +48,31 @@ def run_ocr_pipeline(
         chunk_size=chunk_size,
         timeout_sec=timeout_sec,
     )
-    meta = BookMetadata(
+    captured_at = datetime.now(UTC)
+    initial_meta = BookMetadata(
         title=title,
         page_count=len(pngs),
-        captured_at=datetime.now(UTC),
+        captured_at=captured_at,
         ocr_engine=engine.name,
         output_dir=out_dir,
+        ocr_engine_version=engine.version,
+        ocr_settings=engine.settings,
     )
 
-    pages, index_dict, book_md_str = orchestrator.run(engine, meta, pngs)
+    t0 = time.perf_counter()
+    pages, _index_dict_pre, book_md_str = orchestrator.run(engine, initial_meta, pngs)
+    duration_sec = time.perf_counter() - t0
+    finished_at = datetime.now(UTC)
+
+    meta = replace(
+        initial_meta,
+        ocr_runtime={
+            "started_at": captured_at.isoformat(),
+            "finished_at": finished_at.isoformat(),
+            "duration_sec": round(duration_sec, 3),
+        },
+    )
+    index_dict = render_index(meta, pages)
     writer.write_outputs(
         out_dir=out_dir,
         book_md_filename=f"{title}.md",

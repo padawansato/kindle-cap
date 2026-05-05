@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from book_ocr.models import PageText
 
@@ -11,5 +11,11 @@ from book_ocr.models import PageText
 class OCREngine(Protocol):
     @property
     def name(self) -> str: ...
+
+    @property
+    def version(self) -> str: ...
+
+    @property
+    def settings(self) -> dict[str, Any]: ...
 
     def run_batch(self, pngs: list[Path]) -> list[PageText]: ...

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,10 @@ class BookMetadata:
     captured_at: datetime
     ocr_engine: str
     output_dir: Path
+    # issue #40: 再現性 / トラブルシュート用の追加メタ。optional で後方互換維持
+    ocr_engine_version: str | None = None
+    ocr_settings: dict[str, Any] | None = field(default=None)
+    ocr_runtime: dict[str, Any] | None = field(default=None)
 
     def __post_init__(self) -> None:
         if not self.title:

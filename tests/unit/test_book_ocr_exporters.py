@@ -128,3 +128,79 @@ class TestRenderIndex:
         )
         result = render_index(meta, [page])
         assert result["pages"][0]["png"] == "page_001.png"
+
+
+class TestRenderIndexOptionalMetadata:
+    """issue #40: optional な reproducibility メタを additive に出力する."""
+
+    def test_omits_optional_fields_when_none(self, make_meta: Callable[..., BookMetadata]) -> None:
+        meta = make_meta()  # default は全 None
+        result = render_index(meta, [])
+        assert "ocr_engine_version" not in result
+        assert "ocr_settings" not in result
+        assert "ocr_runtime" not in result
+
+    def test_emits_engine_version_when_set(self) -> None:
+        meta = BookMetadata(
+            title="my-book",
+            page_count=0,
+            captured_at=datetime(2026, 4, 28, 21, 0, 0, tzinfo=UTC),
+            ocr_engine="yomitoku",
+            output_dir=Path("/tmp"),
+            ocr_engine_version="0.12.0",
+        )
+        result = render_index(meta, [])
+        assert result["ocr_engine_version"] == "0.12.0"
+
+    def test_emits_settings_dict_when_set(self) -> None:
+        meta = BookMetadata(
+            title="my-book",
+            page_count=0,
+            captured_at=datetime(2026, 4, 28, 21, 0, 0, tzinfo=UTC),
+            ocr_engine="yomitoku",
+            output_dir=Path("/tmp"),
+            ocr_settings={"device": "mps", "reading_order": "auto", "ignore_meta": True},
+        )
+        result = render_index(meta, [])
+        assert result["ocr_settings"] == {
+            "device": "mps",
+            "reading_order": "auto",
+            "ignore_meta": True,
+        }
+
+    def test_emits_runtime_dict_when_set(self) -> None:
+        meta = BookMetadata(
+            title="my-book",
+            page_count=0,
+            captured_at=datetime(2026, 4, 28, 21, 0, 0, tzinfo=UTC),
+            ocr_engine="yomitoku",
+            output_dir=Path("/tmp"),
+            ocr_runtime={
+                "started_at": "2026-04-28T21:00:00+00:00",
+                "finished_at": "2026-04-28T21:02:00+00:00",
+                "duration_sec": 120.0,
+            },
+        )
+        result = render_index(meta, [])
+        assert result["ocr_runtime"]["duration_sec"] == 120.0
+        assert result["ocr_runtime"]["started_at"] == "2026-04-28T21:00:00+00:00"
+
+    def test_existing_top_level_fields_unchanged_when_optional_set(
+        self, make_meta: Callable[..., BookMetadata]
+    ) -> None:
+        """新フィールド追加で既存フィールドが消えないこと (additive guarantee)。"""
+        from dataclasses import replace
+
+        meta = make_meta()
+        meta_with_extras = replace(
+            meta,
+            ocr_engine_version="0.12.0",
+            ocr_settings={"device": "mps"},
+            ocr_runtime={"duration_sec": 1.0},
+        )
+        result = render_index(meta_with_extras, [])
+        assert result["title"] == "my-book"
+        assert result["page_count"] == 2
+        assert result["ocr_engine"] == "yomitoku"
+        assert "captured_at" in result
+        assert "pages" in result

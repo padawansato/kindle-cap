@@ -136,7 +136,7 @@ uv run book-ocr output/my-book/
 ```text
 output/my-book/
   page_001.png ...                # 既存（キャプチャ時）
-  index.json                      # 新規。{title, page_count, captured_at, ocr_engine, pages}
+  index.json                      # 新規。{title, page_count, captured_at, ocr_engine, ocr_engine_version, ocr_settings, ocr_runtime, pages}
   my-book.md                      # 新規。全文連結（<!-- page:NNN --> 区切り）— grep 一発用
   pages/
     page_001.md ...               # 新規。ページ単位 Markdown

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,6 +20,14 @@ class FakeEngine:
     @property
     def name(self) -> str:
         return "fake"
+
+    @property
+    def version(self) -> str:
+        return "0.0.0-fake"
+
+    @property
+    def settings(self) -> dict[str, Any]:
+        return {"engine": "fake"}
 
     def run_batch(self, pngs: list[Path]) -> list[PageText]:
         return [
@@ -113,6 +122,8 @@ class TestChunkSizeOption:
         mock_engine = MagicMock()
         mock_engine.run_batch.return_value = []
         mock_engine.name = "yomitoku"
+        mock_engine.version = "0.12.0"
+        mock_engine.settings = {"device": "mps"}
         mock_engine_cls.return_value = mock_engine
         book = _make_book_dir(tmp_path, n_pages=1)
 
@@ -126,6 +137,8 @@ class TestChunkSizeOption:
         mock_engine = MagicMock()
         mock_engine.run_batch.return_value = []
         mock_engine.name = "yomitoku"
+        mock_engine.version = "0.12.0"
+        mock_engine.settings = {"device": "mps"}
         mock_engine_cls.return_value = mock_engine
         book = _make_book_dir(tmp_path, n_pages=1)
 
@@ -157,6 +170,8 @@ class TestTimeoutSecOption:
         mock_engine = MagicMock()
         mock_engine.run_batch.return_value = []
         mock_engine.name = "yomitoku"
+        mock_engine.version = "0.12.0"
+        mock_engine.settings = {"device": "mps"}
         mock_engine_cls.return_value = mock_engine
         book = _make_book_dir(tmp_path, n_pages=1)
 
@@ -170,6 +185,8 @@ class TestTimeoutSecOption:
         mock_engine = MagicMock()
         mock_engine.run_batch.return_value = []
         mock_engine.name = "yomitoku"
+        mock_engine.version = "0.12.0"
+        mock_engine.settings = {"device": "mps"}
         mock_engine_cls.return_value = mock_engine
         book = _make_book_dir(tmp_path, n_pages=1)
 
@@ -188,3 +205,40 @@ class TestTimeoutSecOption:
         result = runner.invoke(app, [str(empty), "--timeout-sec", "3600"])
         assert result.exit_code != 0
         assert "No page_*.png" in result.stdout or "No page_*.png" in (result.stderr or "")
+
+
+class TestIndexMetadataExtension:
+    """issue #40: index.json に reproducibility メタが書き込まれること。"""
+
+    def test_index_json_contains_engine_version(self, tmp_path: Path) -> None:
+        book = _make_book_dir(tmp_path, n_pages=1)
+        run_ocr_pipeline(book_dir=book, engine=FakeEngine())
+
+        data = json.loads((book / "index.json").read_text(encoding="utf-8"))
+        assert data["ocr_engine_version"] == "0.0.0-fake"
+
+    def test_index_json_contains_ocr_settings(self, tmp_path: Path) -> None:
+        book = _make_book_dir(tmp_path, n_pages=1)
+        run_ocr_pipeline(book_dir=book, engine=FakeEngine())
+
+        data = json.loads((book / "index.json").read_text(encoding="utf-8"))
+        assert data["ocr_settings"] == {"engine": "fake"}
+
+    def test_index_json_contains_ocr_runtime_with_duration(self, tmp_path: Path) -> None:
+        book = _make_book_dir(tmp_path, n_pages=1)
+        run_ocr_pipeline(book_dir=book, engine=FakeEngine())
+
+        data = json.loads((book / "index.json").read_text(encoding="utf-8"))
+        runtime = data["ocr_runtime"]
+        assert "started_at" in runtime
+        assert "finished_at" in runtime
+        assert isinstance(runtime["duration_sec"], int | float)
+        assert runtime["duration_sec"] >= 0
+
+    def test_index_json_runtime_started_before_finished(self, tmp_path: Path) -> None:
+        book = _make_book_dir(tmp_path, n_pages=1)
+        run_ocr_pipeline(book_dir=book, engine=FakeEngine())
+
+        data = json.loads((book / "index.json").read_text(encoding="utf-8"))
+        runtime = data["ocr_runtime"]
+        assert runtime["started_at"] <= runtime["finished_at"]
