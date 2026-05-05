@@ -22,6 +22,7 @@ def run_ocr_pipeline(
     out: Path | None = None,
     engine: OCREngine | None = None,
     chunk_size: int | None = None,
+    timeout_sec: float = 1800.0,
 ) -> Path:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を出力する.
 
@@ -42,6 +43,7 @@ def run_ocr_pipeline(
         reading_order=reading_order,
         ignore_meta=ignore_meta,
         chunk_size=chunk_size,
+        timeout_sec=timeout_sec,
     )
     meta = BookMetadata(
         title=title,
@@ -93,6 +95,14 @@ def ocr(
             "巨大本で timeout 回避と線形スケール改善。省略時は全 PNG を 1 subprocess。"
         ),
     ),
+    timeout_sec: float = typer.Option(
+        1800.0,
+        "--timeout-sec",
+        help=(
+            "yomitoku subprocess 1 回の timeout (秒、issue #37)。"
+            "chunked 実行時は 1 chunk あたりの上限。巨大本では延長を検討。"
+        ),
+    ),
 ) -> None:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を生成する."""
     try:
@@ -104,6 +114,7 @@ def ocr(
             ignore_meta=ignore_meta,
             out=out,
             chunk_size=chunk_size,
+            timeout_sec=timeout_sec,
         )
     except FileNotFoundError as e:
         typer.echo(str(e), err=True)
