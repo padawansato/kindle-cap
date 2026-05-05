@@ -288,6 +288,130 @@ class TestPageRangeOption:
         assert "No page_*.png" in result.stdout or "No page_*.png" in (result.stderr or "")
 
 
+class TestSkipExistingOption:
+    """issue #41: --skip-existing で既存 page_NNN.md があるページは OCR をスキップ。"""
+
+    def _seed_existing_page(self, book: Path, n: int, body: str) -> None:
+        """`book/pages/page_NNN.md` に render_page_md と同じフォーマットで書き込む。"""
+        pages_dir = book / "pages"
+        pages_dir.mkdir(exist_ok=True)
+        (pages_dir / f"page_{n:03d}.md").write_text(
+            f"<!-- page:{n:03d} -->\n\n{body}", encoding="utf-8"
+        )
+
+    def test_default_skip_existing_is_false(self, tmp_path: Path) -> None:
+        """default では既存 md があっても全ページ OCR する。"""
+        book = _make_book_dir(tmp_path, n_pages=3)
+        self._seed_existing_page(book, 1, "old content for page 1")
+
+        # FakeEngine が呼び出された pngs を記録
+        seen: list[Path] = []
+
+        class CapturingEngine(FakeEngine):
+            def run_batch(self, pngs: list[Path]) -> list[PageText]:
+                seen.extend(pngs)
+                return super().run_batch(pngs)
+
+        run_ocr_pipeline(book_dir=book, engine=CapturingEngine())
+        assert len(seen) == 3  # 既存があっても 3 枚すべて OCR
+
+    def test_skip_existing_skips_pages_with_existing_md(self, tmp_path: Path) -> None:
+        """既存 page_001.md があれば page_001 は OCR されない。"""
+        book = _make_book_dir(tmp_path, n_pages=3)
+        self._seed_existing_page(book, 1, "old content for page 1")
+
+        seen: list[Path] = []
+
+        class CapturingEngine(FakeEngine):
+            def run_batch(self, pngs: list[Path]) -> list[PageText]:
+                seen.extend(pngs)
+                return super().run_batch(pngs)
+
+        run_ocr_pipeline(book_dir=book, engine=CapturingEngine(), skip_existing=True)
+        # page_002, page_003 のみ OCR
+        assert sorted(p.name for p in seen) == ["page_002.png", "page_003.png"]
+
+    def test_skip_existing_preserves_old_content_in_book_md(self, tmp_path: Path) -> None:
+        """skip された既存ページは markdown 本体が保持され、book_md に含まれる。"""
+        book = _make_book_dir(tmp_path, n_pages=2)
+        self._seed_existing_page(book, 1, "OLD CONTENT FOR PAGE 1")
+
+        run_ocr_pipeline(book_dir=book, engine=FakeEngine(), skip_existing=True)
+
+        book_md = (book / "my-book.md").read_text(encoding="utf-8")
+        assert "OLD CONTENT FOR PAGE 1" in book_md  # 既存 page 1 は保持
+        assert "OCR for page_002.png" in book_md  # 新規 page 2 は OCR
+
+    def test_skip_existing_with_no_existing_runs_all(self, tmp_path: Path) -> None:
+        book = _make_book_dir(tmp_path, n_pages=2)
+        # 既存 md なし
+
+        seen: list[Path] = []
+
+        class CapturingEngine(FakeEngine):
+            def run_batch(self, pngs: list[Path]) -> list[PageText]:
+                seen.extend(pngs)
+                return super().run_batch(pngs)
+
+        run_ocr_pipeline(book_dir=book, engine=CapturingEngine(), skip_existing=True)
+        assert len(seen) == 2
+
+    def test_skip_existing_all_pages_existing_no_engine_call(self, tmp_path: Path) -> None:
+        """全ページの md がすでにあれば engine は呼ばれない (高速化)。"""
+        book = _make_book_dir(tmp_path, n_pages=2)
+        self._seed_existing_page(book, 1, "p1")
+        self._seed_existing_page(book, 2, "p2")
+
+        engine_call_count = 0
+
+        class CountingEngine(FakeEngine):
+            def run_batch(self, pngs: list[Path]) -> list[PageText]:
+                nonlocal engine_call_count
+                engine_call_count += 1
+                return super().run_batch(pngs)
+
+        run_ocr_pipeline(book_dir=book, engine=CountingEngine(), skip_existing=True)
+        assert engine_call_count == 0
+
+    def test_skip_existing_empty_md_treated_as_missing(self, tmp_path: Path) -> None:
+        """既存 md が空ファイルなら再 OCR する (壊れた状態のフォールバック)。"""
+        book = _make_book_dir(tmp_path, n_pages=2)
+        pages_dir = book / "pages"
+        pages_dir.mkdir()
+        (pages_dir / "page_001.md").write_text("", encoding="utf-8")
+
+        seen: list[Path] = []
+
+        class CapturingEngine(FakeEngine):
+            def run_batch(self, pngs: list[Path]) -> list[PageText]:
+                seen.extend(pngs)
+                return super().run_batch(pngs)
+
+        run_ocr_pipeline(book_dir=book, engine=CapturingEngine(), skip_existing=True)
+        # 空ファイル page_001 も再 OCR、page_002 も新規 OCR
+        assert len(seen) == 2
+
+    def test_index_page_count_includes_skipped(self, tmp_path: Path) -> None:
+        """skipped ページも index.json の page_count に含まれる。"""
+        book = _make_book_dir(tmp_path, n_pages=3)
+        self._seed_existing_page(book, 1, "p1")
+
+        run_ocr_pipeline(book_dir=book, engine=FakeEngine(), skip_existing=True)
+
+        data = json.loads((book / "index.json").read_text(encoding="utf-8"))
+        assert data["page_count"] == 3
+
+    def test_cli_skip_existing_flag_parses(self, tmp_path: Path) -> None:
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        app = typer.Typer()
+        app.command()(cli.ocr)
+        runner = CliRunner()
+        result = runner.invoke(app, [str(empty), "--skip-existing"])
+        assert result.exit_code != 0
+        assert "No page_*.png" in result.stdout or "No page_*.png" in (result.stderr or "")
+
+
 class TestProgressOption:
     """issue #38: --progress / --no-progress が YomiTokuEngine に伝搬する。"""
 

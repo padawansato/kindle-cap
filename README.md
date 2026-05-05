@@ -157,6 +157,7 @@ output/my-book.pdf                # 既存。視覚確認用
 | `--start-page N` | `1` | OCR 開始ページ番号 (1-indexed inclusive、issue #39) |
 | `--end-page M` | None | OCR 終了ページ番号 (1-indexed inclusive、省略時は最後まで、issue #39) |
 | `--progress / --no-progress` | `--progress` | chunked 実行時に tqdm で chunk 進捗を stderr に表示 (issue #38) |
+| `--skip-existing` | off | 既存 `pages/page_NNN.md` があるページは OCR をスキップ (issue #41)。失敗後の再走を高速化 |
 
 #### 性能の目安（Apple Silicon MPS）
 

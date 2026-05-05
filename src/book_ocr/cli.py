@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -11,9 +12,13 @@ import typer
 
 from book_ocr import orchestrator, writer
 from book_ocr.engines.yomitoku import YomiTokuEngine
+from book_ocr.exporters.book_md import render_book_md
 from book_ocr.exporters.json_index import render_index
-from book_ocr.models import BookMetadata
+from book_ocr.models import BookMetadata, PageText
 from book_ocr.protocols import OCREngine
+
+# render_page_md と対称な逆解析: 先頭の "<!-- page:NNN -->\n\n" を取り除く
+_PAGE_MARKER_RE = re.compile(r"^<!--\s*page:\d+\s*-->\s*\n+", re.DOTALL)
 
 
 def run_ocr_pipeline(
@@ -29,6 +34,7 @@ def run_ocr_pipeline(
     start_page: int = 1,
     end_page: int | None = None,
     progress: bool = True,
+    skip_existing: bool = False,
 ) -> Path:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を出力する.
 
@@ -65,6 +71,14 @@ def run_ocr_pipeline(
         progress=progress,
     )
     captured_at = datetime.now(UTC)
+
+    existing_pages: list[PageText] = []
+    pngs_to_ocr: list[Path] = list(pngs)
+    if skip_existing:
+        existing_pages, pngs_to_ocr = _partition_existing_pages(
+            pngs, out_dir / "pages", engine.name
+        )
+
     initial_meta = BookMetadata(
         title=title,
         page_count=len(pngs),
@@ -76,7 +90,19 @@ def run_ocr_pipeline(
     )
 
     t0 = time.perf_counter()
-    pages, _index_dict_pre, book_md_str = orchestrator.run(engine, initial_meta, pngs)
+    if pngs_to_ocr:
+        if existing_pages:
+            new_pages = engine.run_batch(pngs_to_ocr)
+            pages = _merge_pages(existing_pages, new_pages)
+            book_md_str = render_book_md(pages)
+        else:
+            pages, _index_dict_pre, book_md_str = orchestrator.run(
+                engine, initial_meta, pngs_to_ocr
+            )
+    else:
+        # 全ページ既存 → engine 呼ばず、保存済み内容で book_md を再生成
+        pages = sorted(existing_pages, key=lambda p: p.page_number)
+        book_md_str = render_book_md(pages)
     duration_sec = time.perf_counter() - t0
     finished_at = datetime.now(UTC)
 
@@ -156,6 +182,14 @@ def ocr(
             "非 tty 環境では自動的に無効化される。"
         ),
     ),
+    skip_existing: bool = typer.Option(
+        False,
+        "--skip-existing",
+        help=(
+            "既存 `pages/page_NNN.md` があるページの OCR をスキップ (issue #41)。"
+            "失敗後の再走で chunk 単位 retry を高速化する。空ファイルは missing 扱い。"
+        ),
+    ),
 ) -> None:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を生成する."""
     try:
@@ -171,6 +205,7 @@ def ocr(
             start_page=start_page,
             end_page=end_page,
             progress=progress,
+            skip_existing=skip_existing,
         )
     except FileNotFoundError as e:
         typer.echo(str(e), err=True)
@@ -184,6 +219,46 @@ def ocr(
 def _parse_page_number(p: Path) -> int:
     """`page_NNN.png` から NNN を取り出す。issue #39 の範囲フィルタで使う。"""
     return int(p.stem.split("_")[-1])
+
+
+def _partition_existing_pages(
+    pngs: list[Path], pages_dir: Path, engine_name: str
+) -> tuple[list[PageText], list[Path]]:
+    """`--skip-existing` 用 (issue #41): 既存 `pages/page_NNN.md` を読み出して
+    PageText に再構成し、未存在のページを OCR 対象として返す。
+
+    既存 md 先頭の `<!-- page:NNN -->` プレフィクスは render_page_md と対称に剥がす。
+    空ファイルは `missing` 扱いで再 OCR にまわす (壊れた状態のフォールバック)。"""
+    existing: list[PageText] = []
+    to_ocr: list[Path] = []
+    for png in pngs:
+        n = _parse_page_number(png)
+        md_path = pages_dir / f"page_{n:03d}.md"
+        if not md_path.exists() or md_path.stat().st_size == 0:
+            to_ocr.append(png)
+            continue
+        content = md_path.read_text(encoding="utf-8")
+        body = _PAGE_MARKER_RE.sub("", content, count=1)
+        existing.append(
+            PageText(
+                page_number=n,
+                png_path=png,
+                markdown=body,
+                ocr_engine=engine_name,
+            )
+        )
+    return existing, to_ocr
+
+
+def _merge_pages(existing: list[PageText], new: list[PageText]) -> list[PageText]:
+    """既存ページと新規 OCR ページを page_number 昇順でマージ。重複検出。"""
+    combined = sorted(existing + new, key=lambda p: p.page_number)
+    seen: set[int] = set()
+    for p in combined:
+        if p.page_number in seen:
+            raise ValueError(f"duplicate page_number {p.page_number} after merge")
+        seen.add(p.page_number)
+    return combined
 
 
 def run_ocr() -> None:
