@@ -132,7 +132,7 @@ def _capture_book(
         return
 
     pdf_path = config.out / f"{config.name}.pdf"
-    build_pdf(captured, pdf_path)
+    build_pdf(captured, pdf_path, jpeg_quality=config.pdf_jpeg_quality)
 
     if not config.keep_png:
         for p in captured:

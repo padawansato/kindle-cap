@@ -199,3 +199,44 @@ def test_config_direction_none_allowed() -> None:
     """auto-direction 経路で direction が確定するまで None を保持できる。"""
     c = CaptureConfig(**_valid_config_kwargs(direction=None))
     assert c.direction is None
+
+
+# ---------------------------------------------------------------------------
+# CaptureConfig: pdf_jpeg_quality 境界値
+# ---------------------------------------------------------------------------
+
+
+def test_config_pdf_jpeg_quality_default_is_none() -> None:
+    """未指定なら現状動作 (lossless PNG embed) を保つ."""
+    c = CaptureConfig(**_valid_config_kwargs())
+    assert c.pdf_jpeg_quality is None
+
+
+def test_config_pdf_jpeg_quality_accepts_int() -> None:
+    c = CaptureConfig(**_valid_config_kwargs(pdf_jpeg_quality=80))
+    assert c.pdf_jpeg_quality == 80
+
+
+def test_config_pdf_jpeg_quality_boundary_one_accepted() -> None:
+    c = CaptureConfig(**_valid_config_kwargs(pdf_jpeg_quality=1))
+    assert c.pdf_jpeg_quality == 1
+
+
+def test_config_pdf_jpeg_quality_boundary_hundred_accepted() -> None:
+    c = CaptureConfig(**_valid_config_kwargs(pdf_jpeg_quality=100))
+    assert c.pdf_jpeg_quality == 100
+
+
+def test_config_pdf_jpeg_quality_zero_rejected() -> None:
+    with pytest.raises(ValueError, match="pdf_jpeg_quality"):
+        CaptureConfig(**_valid_config_kwargs(pdf_jpeg_quality=0))
+
+
+def test_config_pdf_jpeg_quality_one_oh_one_rejected() -> None:
+    with pytest.raises(ValueError, match="pdf_jpeg_quality"):
+        CaptureConfig(**_valid_config_kwargs(pdf_jpeg_quality=101))
+
+
+def test_config_pdf_jpeg_quality_negative_rejected() -> None:
+    with pytest.raises(ValueError, match="pdf_jpeg_quality"):
+        CaptureConfig(**_valid_config_kwargs(pdf_jpeg_quality=-1))

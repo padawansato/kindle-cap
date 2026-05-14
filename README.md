@@ -104,6 +104,7 @@ output/my-book.pdf
 | `--keep-png / --no-keep-png` | | `--keep-png` | 中間 PNG を保持するか |
 | `--dry-run` | | off | 1 枚だけ撮って位置確認用に保存（PDF は作らない） |
 | `--auto-stop` | | off | 連続する 2 ページが同一なら書籍末尾と判断して停止 |
+| `--pdf-jpeg-quality N` | | （未指定） | PDF 埋め込み画像を JPEG quality N (1-100) で再圧縮。未指定時は lossless PNG 埋め込み。**テキスト書籍は 80 程度推奨で PDF サイズが ~1/10 に** (issue #50) |
 
 ※ `--direction` または `--auto-direction` のいずれかが必須（同時指定はエラー）
 
@@ -116,6 +117,9 @@ output/my-book.pdf
 ```bash
 uv run kindle-cap-pdf output/my-book
 # → output/my-book.pdf を再生成
+
+# JPEG 再圧縮で PDF サイズを縮小 (テキスト書籍向け)
+uv run kindle-cap-pdf output/my-book --pdf-jpeg-quality 80
 ```
 
 ### book-ocr — OCR で Markdown / index.json を生成（オプション）
