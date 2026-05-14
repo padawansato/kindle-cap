@@ -261,3 +261,115 @@ def test_build_pdf_removes_partial_pdf_on_other_oserror(tmp_path: Path) -> None:
         build_pdf([p], out)
 
     assert not out.exists(), "原例外 OSError でも部分 PDF は削除する"
+
+
+# ---------------------------------------------------------------------------
+# JPEG quality option (PDF サイズ縮小)
+# ---------------------------------------------------------------------------
+
+
+def _make_noisy_png(path: Path, size: tuple[int, int] = (400, 400)) -> Path:
+    """JPEG 圧縮効果が現れるように、ノイズを含む PNG を生成する.
+
+    単色 PNG だと JPEG / PNG どちらでも極小サイズに圧縮されるため、
+    `--pdf-jpeg-quality` の効果検証には判定不能。`Image.effect_noise` で
+    高エントロピーのグレー画像を作り、PNG (lossless) と JPEG (lossy)
+    のサイズ差を実測可能にする。
+    """
+    Image.effect_noise(size, sigma=64).convert("RGB").save(path, format="PNG")
+    return path
+
+
+def test_build_pdf_jpeg_quality_none_keeps_existing_path_input(tmp_path: Path) -> None:
+    """jpeg_quality=None (デフォルト) では img2pdf にパス文字列リストを渡す (現状動作)."""
+    pngs = [_make_rgb_png(tmp_path / "p.png")]
+    captured_args: dict[str, Any] = {}
+
+    real_convert = __import__("img2pdf").convert
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        captured_args["positional"] = args
+        return real_convert(*args, **kwargs)
+
+    with patch("kindle_cap.pdf.img2pdf.convert", side_effect=spy):
+        build_pdf(pngs, tmp_path / "out.pdf")
+
+    first = captured_args["positional"][0]
+    assert isinstance(first, list)
+    assert all(isinstance(x, str) for x in first), (
+        "jpeg_quality 未指定時はパス文字列のまま渡し、現状の lossless PNG embed を維持する"
+    )
+
+
+def test_build_pdf_jpeg_quality_passes_bytes_to_img2pdf(tmp_path: Path) -> None:
+    """jpeg_quality 指定時は Pillow で JPEG bytes に変換した結果を img2pdf に渡す."""
+    pngs = [_make_rgb_png(tmp_path / "p.png")]
+    captured_args: dict[str, Any] = {}
+
+    real_convert = __import__("img2pdf").convert
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        captured_args["positional"] = args
+        return real_convert(*args, **kwargs)
+
+    with patch("kindle_cap.pdf.img2pdf.convert", side_effect=spy):
+        build_pdf(pngs, tmp_path / "out.pdf", jpeg_quality=80)
+
+    first = captured_args["positional"][0]
+    assert isinstance(first, list)
+    assert all(isinstance(x, bytes) for x in first)
+    assert first[0].startswith(b"\xff\xd8\xff"), "JPEG SOI marker (FFD8FF) で始まる bytes である"
+
+
+def test_build_pdf_jpeg_quality_creates_smaller_pdf(tmp_path: Path) -> None:
+    """ノイズ画像で JPEG 80 と lossless PNG の PDF サイズを比較し、JPEG 版が小さいこと."""
+    pngs = [_make_noisy_png(tmp_path / f"p_{i}.png") for i in range(3)]
+    out_lossless = tmp_path / "lossless.pdf"
+    out_jpeg = tmp_path / "jpeg.pdf"
+
+    build_pdf(pngs, out_lossless)
+    build_pdf(pngs, out_jpeg, jpeg_quality=50)
+
+    lossless_size = out_lossless.stat().st_size
+    jpeg_size = out_jpeg.stat().st_size
+    assert jpeg_size < lossless_size, (
+        f"JPEG quality=50 (size={jpeg_size}) は lossless (size={lossless_size}) より小さくなるべき"
+    )
+
+
+def test_build_pdf_jpeg_quality_produces_valid_pdf(tmp_path: Path) -> None:
+    """jpeg_quality 指定時も pypdf でページ数が読める正しい PDF を生成する."""
+    pngs = [_make_rgb_png(tmp_path / f"p_{i}.png") for i in range(3)]
+    out = tmp_path / "out.pdf"
+    build_pdf(pngs, out, jpeg_quality=80)
+    assert len(PdfReader(str(out)).pages) == 3
+
+
+def test_build_pdf_jpeg_quality_handles_rgba_png(tmp_path: Path) -> None:
+    """RGBA PNG (透過あり) も JPEG 変換できる (RGB に flatten される)."""
+    p = tmp_path / "rgba.png"
+    Image.new("RGBA", (100, 100), (255, 0, 0, 128)).save(p)
+    out = tmp_path / "rgba.pdf"
+    build_pdf([p], out, jpeg_quality=80)
+    assert len(PdfReader(str(out)).pages) == 1
+
+
+def test_build_pdf_rejects_jpeg_quality_too_low(tmp_path: Path) -> None:
+    p = _make_rgb_png(tmp_path / "p.png")
+    with pytest.raises(ValueError, match="jpeg_quality"):
+        build_pdf([p], tmp_path / "out.pdf", jpeg_quality=0)
+
+
+def test_build_pdf_rejects_jpeg_quality_too_high(tmp_path: Path) -> None:
+    p = _make_rgb_png(tmp_path / "p.png")
+    with pytest.raises(ValueError, match="jpeg_quality"):
+        build_pdf([p], tmp_path / "out.pdf", jpeg_quality=101)
+
+
+def test_build_pdf_accepts_jpeg_quality_boundaries(tmp_path: Path) -> None:
+    """境界値 1 / 100 は受理する."""
+    p = _make_rgb_png(tmp_path / "p.png")
+    build_pdf([p], tmp_path / "q1.pdf", jpeg_quality=1)
+    build_pdf([p], tmp_path / "q100.pdf", jpeg_quality=100)
+    assert (tmp_path / "q1.pdf").exists()
+    assert (tmp_path / "q100.pdf").exists()

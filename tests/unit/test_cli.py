@@ -306,3 +306,90 @@ def test_capture_auto_direction_combined_with_auto_stop(
     assert result.exit_code == 0, result.output
     assert mock_run.call_args.kwargs.get("auto_direction") is True
     assert mock_run.call_args.kwargs.get("auto_stop") is True
+
+
+# ---------------------------------------------------------------------------
+# --pdf-jpeg-quality
+# ---------------------------------------------------------------------------
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_pdf_jpeg_quality_default_is_none(mock_run: MagicMock, tmp_path: Path) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.args[0].pdf_jpeg_quality is None
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_pdf_jpeg_quality_passes_through(mock_run: MagicMock, tmp_path: Path) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        [
+            "--name",
+            "x",
+            "--pages",
+            "1",
+            "--direction",
+            "rtl",
+            "--out",
+            str(tmp_path),
+            "--pdf-jpeg-quality",
+            "80",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.args[0].pdf_jpeg_quality == 80
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_pdf_jpeg_quality_out_of_range_exits_nonzero(
+    mock_run: MagicMock, tmp_path: Path
+) -> None:
+    """範囲外 (0 / 101) は CaptureConfig の validation で BadParameter になり exit 非 0."""
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        [
+            "--name",
+            "x",
+            "--pages",
+            "1",
+            "--direction",
+            "rtl",
+            "--out",
+            str(tmp_path),
+            "--pdf-jpeg-quality",
+            "0",
+        ],
+    )
+    assert result.exit_code != 0
+    assert not mock_run.called
+
+
+@patch("kindle_cap.cli.build_pdf")
+def test_rebuild_pdf_pdf_jpeg_quality_passes_through(mock_build: MagicMock, tmp_path: Path) -> None:
+    book = tmp_path / "my-book"
+    book.mkdir()
+    (book / "page_001.png").write_bytes(b"a")
+    app = _make_app(rebuild_pdf)
+    result = runner.invoke(app, [str(book), "--pdf-jpeg-quality", "70"])
+    assert result.exit_code == 0, result.output
+    assert mock_build.call_args.kwargs.get("jpeg_quality") == 70
+
+
+@patch("kindle_cap.cli.build_pdf")
+def test_rebuild_pdf_pdf_jpeg_quality_default_is_none(
+    mock_build: MagicMock, tmp_path: Path
+) -> None:
+    book = tmp_path / "my-book"
+    book.mkdir()
+    (book / "page_001.png").write_bytes(b"a")
+    app = _make_app(rebuild_pdf)
+    result = runner.invoke(app, [str(book)])
+    assert result.exit_code == 0, result.output
+    assert mock_build.call_args.kwargs.get("jpeg_quality") is None

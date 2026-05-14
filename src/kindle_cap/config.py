@@ -26,6 +26,7 @@ class CaptureConfig:
     wait: float
     out: Path
     keep_png: bool
+    pdf_jpeg_quality: int | None = None
 
     def __post_init__(self) -> None:
         if self.pages <= 0:
@@ -40,3 +41,5 @@ class CaptureConfig:
             raise ValueError("name must not contain null bytes")
         if self.name in (".", ".."):
             raise ValueError("name must not be '.' or '..'")
+        if self.pdf_jpeg_quality is not None and not (1 <= self.pdf_jpeg_quality <= 100):
+            raise ValueError(f"pdf_jpeg_quality must be in 1..100 (got {self.pdf_jpeg_quality})")
