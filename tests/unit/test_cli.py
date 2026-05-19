@@ -393,3 +393,59 @@ def test_rebuild_pdf_pdf_jpeg_quality_default_is_none(
     result = runner.invoke(app, [str(book)])
     assert result.exit_code == 0, result.output
     assert mock_build.call_args.kwargs.get("jpeg_quality") is None
+
+
+# ---------------------------------------------------------------------------
+# rebuild_pdf: ページ番号の数値順ソート (1000+ ページ書籍の回帰防止)
+# ---------------------------------------------------------------------------
+
+
+@patch("kindle_cap.cli.build_pdf")
+def test_rebuild_pdf_orders_pngs_numerically_with_4digit_files(
+    mock_build: MagicMock, tmp_path: Path
+) -> None:
+    """3 桁/4 桁混在の書籍 (>=1000 ページ) でも PNG が数値順に並ぶ。
+
+    実際の bug: lex 順 sort だと page_1000.png が page_101.png より前に
+    挿入され、PDF のページ順序が破綻していた。
+    """
+    book = tmp_path / "huge-book"
+    book.mkdir()
+    page_nums = [1, 9, 10, 100, 999, 1000, 1099, 1100, 1453]
+    for n in page_nums:
+        (book / f"page_{n:03d}.png").write_bytes(b"")
+
+    app = _make_app(rebuild_pdf)
+    result = runner.invoke(app, [str(book)])
+
+    assert result.exit_code == 0, result.output
+    pngs_arg = mock_build.call_args.args[0]
+    received = [p.name for p in pngs_arg]
+    expected = [f"page_{n:03d}.png" for n in page_nums]
+    assert received == expected, (
+        f"PNG が数値順に並んでいない:\n  expected: {expected}\n  got:      {received}"
+    )
+
+
+@patch("kindle_cap.cli.build_pdf")
+def test_rebuild_pdf_orders_pngs_numerically_3digit_only(
+    mock_build: MagicMock, tmp_path: Path
+) -> None:
+    """1000 ページ未満 (3 桁のみ) の書籍は数値順 == lex 順で従来通り."""
+    book = tmp_path / "small-book"
+    book.mkdir()
+    for n in [1, 2, 50, 100, 999]:
+        (book / f"page_{n:03d}.png").write_bytes(b"")
+
+    app = _make_app(rebuild_pdf)
+    result = runner.invoke(app, [str(book)])
+
+    assert result.exit_code == 0, result.output
+    pngs_arg = mock_build.call_args.args[0]
+    assert [p.name for p in pngs_arg] == [
+        "page_001.png",
+        "page_002.png",
+        "page_050.png",
+        "page_100.png",
+        "page_999.png",
+    ]

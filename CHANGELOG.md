@@ -34,6 +34,7 @@
 
 ### Fixed
 
+- `kindle-cap-pdf`: 1000 ページを超える書籍で PDF のページ順序が破綻していたのを修正。`sorted(directory.glob("page_*.png"))` が辞書順だったため、`page_1000.png` (4 桁) が `page_101.png` (3 桁) より前に挿入されていた。例: 1453 ページ書籍では PDF 最終ページが `page_999.png` で終わり、本来の最終 `page_1453.png` は中盤に紛れていた。`page_NNN` の数値で sort するように修正
 - ディスク容量不足 (`ENOSPC`) で PDF 生成が失敗したときに生 traceback を露出していたのを改修。`PdfBuildError` を raise し、CLI で日本語の説明的メッセージ + exit 1 で終了する。部分書き込みされた PDF は削除し、PNG は保持して `kindle-cap-pdf` で再生成可能 (issue #19)
 - `docs/ocr-bench/2026-04-28.md` の markdownlint 警告 5 件 (MD040 / MD032 / MD036) を解消 (issue #20)
 - `book_ocr.engines.yomitoku.YomiTokuEngine`：yomitoku subprocess の stderr 握り潰しと timeout 未設定を改修。非ゼロ exit / timeout 双方で `stdout`/`stderr`/`exit code` を含む `RuntimeError` を raise (issue #21)
