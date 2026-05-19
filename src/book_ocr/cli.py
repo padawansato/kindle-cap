@@ -15,6 +15,7 @@ from book_ocr.engines.yomitoku import YomiTokuEngine
 from book_ocr.exporters.book_md import render_book_md
 from book_ocr.exporters.json_index import render_index
 from book_ocr.models import BookMetadata, PageText
+from book_ocr.preflight import PreflightError, check_disk_space
 from book_ocr.protocols import OCREngine
 
 # render_page_md と対称な逆解析: 先頭の "<!-- page:NNN -->\n\n" を取り除く
@@ -35,6 +36,7 @@ def run_ocr_pipeline(
     end_page: int | None = None,
     progress: bool = True,
     skip_existing: bool = False,
+    ignore_disk_check: bool = False,
 ) -> Path:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を出力する.
 
@@ -61,6 +63,9 @@ def run_ocr_pipeline(
 
     title = name or book_dir.name
     out_dir = out or book_dir
+
+    if not ignore_disk_check:
+        check_disk_space(pngs=pngs, out_dir=out_dir, chunk_size=chunk_size)
 
     engine = engine or YomiTokuEngine(
         device=device,
@@ -190,6 +195,14 @@ def ocr(
             "失敗後の再走で chunk 単位 retry を高速化する。空ファイルは missing 扱い。"
         ),
     ),
+    ignore_disk_check: bool = typer.Option(
+        False,
+        "--ignore-disk-check",
+        help=(
+            "起動時のディスク容量 preflight をバイパスする (issue #48)。"
+            "デフォルトでは入力 PNG × 1.5 のマージンで out_dir / tempdir の残量を確認する。"
+        ),
+    ),
 ) -> None:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を生成する."""
     try:
@@ -206,12 +219,16 @@ def ocr(
             end_page=end_page,
             progress=progress,
             skip_existing=skip_existing,
+            ignore_disk_check=ignore_disk_check,
         )
     except FileNotFoundError as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1) from e
     except ValueError as e:
         typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
+    except PreflightError as e:
+        typer.echo(f"[エラー] {e}", err=True)
         raise typer.Exit(1) from e
     typer.echo(f"OCR complete: {out_path}")
 
