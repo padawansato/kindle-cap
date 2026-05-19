@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-20
+
 ### Added
 
 - `--auto-direction`：表紙起点で試写し、ページ綴じ方向（rtl/ltr）を自動判定。試写 3 枚は本番に流用するため重複撮影しない（issue #15）
@@ -24,6 +26,8 @@
 - `tqdm>=4.0` を base 依存に追加（chunked 進捗表示で必要、CI でも常時入手するため `[ocr]` extra ではなく base に置く）
 - `book-ocr --skip-existing` CLI オプション + `book_ocr.cli.run_ocr_pipeline(..., skip_existing=True)`：既存 `pages/page_NNN.md` があるページは OCR をスキップ。失敗後 chunk 単位 retry を高速化。空ファイルは missing 扱いで再 OCR される。既存 md 先頭の `<!-- page:NNN -->` プレフィクスは render_page_md と対称に剥がして PageText を再構成する（issue #41）
 - `--pdf-jpeg-quality N` CLI オプション (`kindle-cap` / `kindle-cap-pdf` 双方) + `CaptureConfig.pdf_jpeg_quality` + `build_pdf(..., jpeg_quality=N)`：PDF 埋め込み画像を JPEG quality N (1-100) で再圧縮。未指定時は従来通り lossless PNG 埋め込み。テキスト書籍では quality 80 程度で同解像度のまま PDF サイズが ~1/10 になる (issue #50)
+- `kindle-cap-pdf --progress` / `--no-progress` CLI オプション：JPEG 変換進捗を `tqdm` で stderr に表示。非 tty 環境では自動的に無効化（issue #53）
+- `book-ocr` 起動時のディスク容量 preflight チェック：入力 PNG × 1.5 のマージンで `out_dir` / tempdir の残量を確認し、不足時は `PreflightError` で早期 exit。`--ignore-disk-check` でバイパス可能（issue #48）
 
 ### Changed
 
@@ -60,5 +64,6 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/padawansato/kindle-cap/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/padawansato/kindle-cap/releases/tag/v0.1.0

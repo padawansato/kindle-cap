@@ -1,6 +1,6 @@
 [project]
 name = "kindle-cap"
-version = "0.1.0"
+version = "0.2.0"
 description = "Capture Kindle for Mac pages into a single PDF (個人利用 CLI)"
 readme = "README.md"
 license = "MIT"
