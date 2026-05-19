@@ -124,7 +124,10 @@ uv run kindle-cap-pdf output/my-book --pdf-jpeg-quality 80
 
 ### book-ocr — OCR で Markdown / index.json を生成（オプション）
 
-ClaudeCode 等から書籍内容を「対話的に質問・情報源として活用」したい場合、撮影後に `book-ocr` を実行すると [YomiToku](https://github.com/kotaro-kinoshita/yomitoku) で OCR し、grep 可能な Markdown と index.json を生成する（既存 PNG / PDF はそのまま残る）。
+> [!TIP]
+> **AI で読ませる用途は markdown を推奨**。本ツールの出力 PDF は典型的に 100 MB 〜 1 GB と大きく、Claude Code の `Read` ツールには **100 MB 上限 + `poppler` (`pdftoppm`) 依存** があるため直接渡せない。`book-ocr` で生成した markdown はサイズが PDF の約 1/500、token も 1/3-1/5 と効率的で、`Read` でそのまま開ける。PDF は視覚確認・人間閲覧用と割り切るのが実用的（実測レポート: [`docs/ai-readability/2026-05-20.md`](docs/ai-readability/2026-05-20.md)）。
+
+撮影後に `book-ocr` を実行すると [YomiToku](https://github.com/kotaro-kinoshita/yomitoku) で OCR し、grep 可能な Markdown と index.json を生成する（既存 PNG / PDF はそのまま残る）。
 
 ```bash
 # YomiToku を含めて再インストール（約 1.5GB の追加依存）
