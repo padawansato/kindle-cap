@@ -1,5 +1,6 @@
 """Typer-based CLI entry points for kindle_cap."""
 
+import re
 from pathlib import Path
 
 import typer
@@ -8,6 +9,16 @@ from .config import CaptureConfig, Direction
 from .orchestrator import run as orchestrator_run
 from .pdf import PdfBuildError, build_pdf
 from .preflight import PreflightError
+
+# `page_{n:03d}.png` で生成された PNG を **数値順** に並べるためのキー。
+# 書籍が 1000 ページを超えると 3 桁と 4 桁が混在し、辞書順 sort では
+# `page_1000.png` が `page_101.png` より先に来てしまうため数値で比較する。
+_PAGE_NUM_RE = re.compile(r"page_(\d+)\.png$")
+
+
+def _page_num(p: Path) -> int:
+    m = _PAGE_NUM_RE.match(p.name)
+    return int(m.group(1)) if m else 0
 
 
 def capture(
@@ -114,7 +125,7 @@ def rebuild_pdf(
         ),
     ),
 ) -> None:
-    pngs = sorted(directory.glob("page_*.png"))
+    pngs = sorted(directory.glob("page_*.png"), key=_page_num)
     if not pngs:
         typer.echo(f"[エラー] {directory} に page_*.png が見つかりません", err=True)
         raise typer.Exit(code=1)
