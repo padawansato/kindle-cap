@@ -373,3 +373,62 @@ def test_build_pdf_accepts_jpeg_quality_boundaries(tmp_path: Path) -> None:
     build_pdf([p], tmp_path / "q100.pdf", jpeg_quality=100)
     assert (tmp_path / "q1.pdf").exists()
     assert (tmp_path / "q100.pdf").exists()
+
+
+# ---------------------------------------------------------------------------
+# Progress (tqdm) option for JPEG conversion loop (issue #53)
+# ---------------------------------------------------------------------------
+
+
+def test_build_pdf_progress_default_does_not_use_tqdm(tmp_path: Path) -> None:
+    """progress=False (デフォルト) では tqdm でラップされない."""
+    pngs = [_make_rgb_png(tmp_path / f"p_{i}.png") for i in range(3)]
+    with patch("kindle_cap.pdf.tqdm") as mock_tqdm:
+        build_pdf(pngs, tmp_path / "out.pdf", jpeg_quality=80)
+    mock_tqdm.assert_not_called()
+
+
+def test_build_pdf_progress_true_wraps_jpeg_loop_with_tqdm(tmp_path: Path) -> None:
+    """progress=True + jpeg_quality 指定 + 複数ページなら tqdm が呼ばれる."""
+    pngs = [_make_rgb_png(tmp_path / f"p_{i}.png") for i in range(3)]
+    with patch("kindle_cap.pdf.tqdm", side_effect=lambda it, **kw: it) as mock_tqdm:
+        build_pdf(pngs, tmp_path / "out.pdf", jpeg_quality=80, progress=True)
+    mock_tqdm.assert_called_once()
+    # tqdm に渡される最初の引数は png_paths リスト
+    args, _ = mock_tqdm.call_args
+    assert args[0] == pngs
+
+
+def test_build_pdf_progress_true_without_jpeg_quality_does_not_use_tqdm(
+    tmp_path: Path,
+) -> None:
+    """jpeg_quality=None のときは JPEG ループがないため progress=True でも tqdm 不要."""
+    pngs = [_make_rgb_png(tmp_path / f"p_{i}.png") for i in range(3)]
+    with patch("kindle_cap.pdf.tqdm") as mock_tqdm:
+        build_pdf(pngs, tmp_path / "out.pdf", progress=True)
+    mock_tqdm.assert_not_called()
+
+
+def test_build_pdf_progress_true_with_single_png_does_not_use_tqdm(
+    tmp_path: Path,
+) -> None:
+    """1 ページのときは進捗バーが意味を持たないので tqdm を呼ばない."""
+    p = _make_rgb_png(tmp_path / "only.png")
+    with patch("kindle_cap.pdf.tqdm") as mock_tqdm:
+        build_pdf([p], tmp_path / "out.pdf", jpeg_quality=80, progress=True)
+    mock_tqdm.assert_not_called()
+
+
+def test_build_pdf_progress_disables_tqdm_when_stderr_not_tty(
+    tmp_path: Path,
+) -> None:
+    """非 tty (CI 等) では tqdm を呼ぶが disable=True を渡す."""
+    pngs = [_make_rgb_png(tmp_path / f"p_{i}.png") for i in range(3)]
+    with (
+        patch("kindle_cap.pdf.sys.stderr.isatty", return_value=False),
+        patch("kindle_cap.pdf.tqdm", side_effect=lambda it, **kw: it) as mock_tqdm,
+    ):
+        build_pdf(pngs, tmp_path / "out.pdf", jpeg_quality=80, progress=True)
+    mock_tqdm.assert_called_once()
+    _, kwargs = mock_tqdm.call_args
+    assert kwargs.get("disable") is True
