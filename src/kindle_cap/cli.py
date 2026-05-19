@@ -65,6 +65,14 @@ def capture(
             "テキスト書籍は 80 程度推奨"
         ),
     ),
+    progress: bool = typer.Option(
+        False,
+        "--progress/--no-progress",
+        help=(
+            "--pdf-jpeg-quality 指定時の JPEG 変換ループ進捗を tqdm で stderr に"
+            "表示 (1000+ ページ書籍向け、issue #53)"
+        ),
+    ),
 ) -> None:
     if direction is not None and auto_direction:
         raise typer.BadParameter(
@@ -89,6 +97,7 @@ def capture(
             out=out,
             keep_png=keep_png,
             pdf_jpeg_quality=pdf_jpeg_quality,
+            progress=progress,
         )
     except ValueError as e:
         raise typer.BadParameter(str(e)) from e
@@ -124,6 +133,14 @@ def rebuild_pdf(
             "PDF 埋め込み画像を JPEG quality N (1-100) で再圧縮。未指定時は lossless PNG 埋め込み"
         ),
     ),
+    progress: bool = typer.Option(
+        False,
+        "--progress/--no-progress",
+        help=(
+            "--pdf-jpeg-quality 指定時の JPEG 変換ループ進捗を tqdm で stderr に"
+            "表示 (1000+ ページ書籍向け、issue #53)"
+        ),
+    ),
 ) -> None:
     pngs = sorted(directory.glob("page_*.png"), key=_page_num)
     if not pngs:
@@ -131,7 +148,7 @@ def rebuild_pdf(
         raise typer.Exit(code=1)
     out_path = directory.parent / f"{directory.name}.pdf"
     try:
-        build_pdf(pngs, out_path, jpeg_quality=pdf_jpeg_quality)
+        build_pdf(pngs, out_path, jpeg_quality=pdf_jpeg_quality, progress=progress)
     except PdfBuildError as e:
         typer.echo(f"[エラー] {e}", err=True)
         raise typer.Exit(code=1) from e

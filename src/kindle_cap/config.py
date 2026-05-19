@@ -27,6 +27,7 @@ class CaptureConfig:
     out: Path
     keep_png: bool
     pdf_jpeg_quality: int | None = None
+    progress: bool = False
 
     def __post_init__(self) -> None:
         if self.pages <= 0:
