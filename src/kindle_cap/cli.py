@@ -8,9 +8,13 @@ from pathlib import Path
 import typer
 
 from .config import CaptureConfig, Direction
+from .keys import KeystrokeError
 from .orchestrator import run as orchestrator_run
 from .pdf import PdfBuildError, build_pdf
 from .preflight import PreflightError
+from .window import KindleActivationError, WindowGeometryError
+
+logger = logging.getLogger(__name__)
 
 # `page_{n:03d}.png` で生成された PNG を **数値順** に並べるためのキー。
 # 書籍が 1000 ページを超えると 3 桁と 4 桁が混在し、辞書順 sort では
@@ -159,11 +163,14 @@ def capture(
             auto_stop=auto_stop,
             auto_direction=auto_direction,
         )
-    except PreflightError as e:
-        typer.echo(f"[エラー] {e}", err=True)
-        raise typer.Exit(code=1) from e
-    except PdfBuildError as e:
-        typer.echo(f"[エラー] {e}", err=True)
+    except (
+        PreflightError,
+        PdfBuildError,
+        WindowGeometryError,
+        KindleActivationError,
+        KeystrokeError,
+    ) as e:
+        logger.error("%s", e)
         raise typer.Exit(code=1) from e
 
 
@@ -217,13 +224,10 @@ def rebuild_pdf(
     out_path = directory.parent / f"{directory.name}.pdf"
     try:
         build_pdf(pngs, out_path, jpeg_quality=pdf_jpeg_quality, progress=progress)
-    except PdfBuildError as e:
-        typer.echo(f"[エラー] {e}", err=True)
+    except (PdfBuildError, ValueError) as e:
+        logger.error("%s", e)
         raise typer.Exit(code=1) from e
-    except ValueError as e:
-        typer.echo(f"[エラー] {e}", err=True)
-        raise typer.Exit(code=1) from e
-    typer.echo(f"PDF を作成しました: {out_path}")
+    logger.info("PDF を作成しました: %s", out_path)
 
 
 def run_capture() -> None:

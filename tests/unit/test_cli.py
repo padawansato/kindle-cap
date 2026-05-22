@@ -9,7 +9,9 @@ from typer.testing import CliRunner
 
 from kindle_cap.cli import capture, rebuild_pdf
 from kindle_cap.config import Direction
+from kindle_cap.keys import KeystrokeError
 from kindle_cap.pdf import PdfBuildError
+from kindle_cap.window import KindleActivationError, WindowGeometryError
 
 
 @pytest.fixture(autouse=True)
@@ -644,3 +646,47 @@ def test_rebuild_pdf_log_file_adds_file_handler(mock_build: MagicMock, tmp_path:
     logger = logging.getLogger("kindle_cap")
     file_handlers = [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
     assert any(Path(h.baseFilename) == log_path for h in file_handlers)
+
+
+# ---------------------------------------------------------------------------
+# 新規 custom exception のハンドリング (issue #62)
+# ---------------------------------------------------------------------------
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_window_geometry_error_exits_nonzero(mock_run: MagicMock, tmp_path: Path) -> None:
+    """WindowGeometryError は exit 1 + メッセージを stderr に出して終わる (traceback ではない)"""
+    mock_run.side_effect = WindowGeometryError(
+        "osascript geometry probe failed (exit 1): isn't running"
+    )
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+    )
+    assert result.exit_code != 0
+    assert "isn't running" in result.output
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_kindle_activation_error_exits_nonzero(mock_run: MagicMock, tmp_path: Path) -> None:
+    mock_run.side_effect = KindleActivationError("osascript activate failed (exit 1): some error")
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+    )
+    assert result.exit_code != 0
+    assert "activate failed" in result.output
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_keystroke_error_exits_nonzero(mock_run: MagicMock, tmp_path: Path) -> None:
+    mock_run.side_effect = KeystrokeError("osascript keystroke failed (exit 1): some error")
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+    )
+    assert result.exit_code != 0
+    assert "keystroke failed" in result.output
