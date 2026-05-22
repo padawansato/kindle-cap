@@ -1,13 +1,30 @@
-from collections.abc import Callable
+import logging
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 import typer
 from typer.testing import CliRunner
 
 from kindle_cap.cli import capture, rebuild_pdf
 from kindle_cap.config import Direction
 from kindle_cap.pdf import PdfBuildError
+
+
+@pytest.fixture(autouse=True)
+def _reset_kindle_cap_logger() -> Iterator[None]:
+    """各テスト後に `kindle_cap` ロガーをリセット（テスト間漏れ防止）。
+
+    `_setup_logging` は handler を attach するため、複数テストで呼ばれると
+    handler が累積し、FileHandler はファイルハンドルを開いたままになる。"""
+    yield
+    logger = logging.getLogger("kindle_cap")
+    for handler in logger.handlers[:]:
+        handler.close()
+        logger.removeHandler(handler)
+    logger.setLevel(logging.NOTSET)
+
 
 runner = CliRunner()
 
@@ -449,3 +466,181 @@ def test_rebuild_pdf_orders_pngs_numerically_3digit_only(
         "page_100.png",
         "page_999.png",
     ]
+
+
+# ---------------------------------------------------------------------------
+# logging 設定: --verbose / --quiet / --log-file (issue #62)
+# ---------------------------------------------------------------------------
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_default_log_level_is_info(mock_run: MagicMock, tmp_path: Path) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert logging.getLogger("kindle_cap").level == logging.INFO
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_verbose_sets_debug_level(mock_run: MagicMock, tmp_path: Path) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        [
+            "--name",
+            "x",
+            "--pages",
+            "1",
+            "--direction",
+            "rtl",
+            "--out",
+            str(tmp_path),
+            "--verbose",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert logging.getLogger("kindle_cap").level == logging.DEBUG
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_verbose_short_flag(mock_run: MagicMock, tmp_path: Path) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path), "-v"],
+    )
+    assert result.exit_code == 0, result.output
+    assert logging.getLogger("kindle_cap").level == logging.DEBUG
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_quiet_sets_warning_level(mock_run: MagicMock, tmp_path: Path) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        [
+            "--name",
+            "x",
+            "--pages",
+            "1",
+            "--direction",
+            "rtl",
+            "--out",
+            str(tmp_path),
+            "--quiet",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert logging.getLogger("kindle_cap").level == logging.WARNING
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_quiet_short_flag(mock_run: MagicMock, tmp_path: Path) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path), "-q"],
+    )
+    assert result.exit_code == 0, result.output
+    assert logging.getLogger("kindle_cap").level == logging.WARNING
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_verbose_and_quiet_conflict_exits_nonzero(
+    mock_run: MagicMock, tmp_path: Path
+) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        [
+            "--name",
+            "x",
+            "--pages",
+            "1",
+            "--direction",
+            "rtl",
+            "--out",
+            str(tmp_path),
+            "--verbose",
+            "--quiet",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "同時指定" in result.output
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_log_file_adds_file_handler(mock_run: MagicMock, tmp_path: Path) -> None:
+    log_path = tmp_path / "kc.log"
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        [
+            "--name",
+            "x",
+            "--pages",
+            "1",
+            "--direction",
+            "rtl",
+            "--out",
+            str(tmp_path),
+            "--log-file",
+            str(log_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    logger = logging.getLogger("kindle_cap")
+    file_handlers = [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
+    assert any(Path(h.baseFilename) == log_path for h in file_handlers)
+
+
+@patch("kindle_cap.cli.build_pdf")
+def test_rebuild_pdf_verbose_sets_debug_level(mock_build: MagicMock, tmp_path: Path) -> None:
+    book = tmp_path / "bk"
+    book.mkdir()
+    (book / "page_001.png").write_bytes(b"a")
+    app = _make_app(rebuild_pdf)
+    result = runner.invoke(app, [str(book), "--verbose"])
+    assert result.exit_code == 0, result.output
+    assert logging.getLogger("kindle_cap").level == logging.DEBUG
+
+
+@patch("kindle_cap.cli.build_pdf")
+def test_rebuild_pdf_quiet_sets_warning_level(mock_build: MagicMock, tmp_path: Path) -> None:
+    book = tmp_path / "bk"
+    book.mkdir()
+    (book / "page_001.png").write_bytes(b"a")
+    app = _make_app(rebuild_pdf)
+    result = runner.invoke(app, [str(book), "--quiet"])
+    assert result.exit_code == 0, result.output
+    assert logging.getLogger("kindle_cap").level == logging.WARNING
+
+
+@patch("kindle_cap.cli.build_pdf")
+def test_rebuild_pdf_verbose_and_quiet_conflict_exits_nonzero(
+    mock_build: MagicMock, tmp_path: Path
+) -> None:
+    book = tmp_path / "bk"
+    book.mkdir()
+    (book / "page_001.png").write_bytes(b"a")
+    app = _make_app(rebuild_pdf)
+    result = runner.invoke(app, [str(book), "--verbose", "--quiet"])
+    assert result.exit_code != 0
+    assert "同時指定" in result.output
+
+
+@patch("kindle_cap.cli.build_pdf")
+def test_rebuild_pdf_log_file_adds_file_handler(mock_build: MagicMock, tmp_path: Path) -> None:
+    log_path = tmp_path / "kc.log"
+    book = tmp_path / "bk"
+    book.mkdir()
+    (book / "page_001.png").write_bytes(b"a")
+    app = _make_app(rebuild_pdf)
+    result = runner.invoke(app, [str(book), "--log-file", str(log_path)])
+    assert result.exit_code == 0, result.output
+    logger = logging.getLogger("kindle_cap")
+    file_handlers = [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
+    assert any(Path(h.baseFilename) == log_path for h in file_handlers)
