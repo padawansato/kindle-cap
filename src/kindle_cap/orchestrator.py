@@ -3,6 +3,7 @@
 import contextlib
 import dataclasses
 import hashlib
+import logging
 from pathlib import Path
 from time import sleep
 
@@ -12,6 +13,8 @@ from .keys import send_next_page
 from .pdf import build_pdf
 from .preflight import detect_direction, preflight
 from .window import activate_kindle, get_window_geometry
+
+logger = logging.getLogger(__name__)
 
 
 def run(
@@ -96,20 +99,27 @@ def _capture_book(
                 send_next_page(config.direction)
                 sleep(config.wait)
 
-            print(f"[{i}/{config.pages}] capturing page", flush=True)
-            activate_kindle()
-            geom = get_window_geometry()
-            png_path = out_dir / f"page_{i:03d}.png"
-            capture_rect(geom, png_path)
+            logger.info("[%d/%d] capturing page", i, config.pages)
+            try:
+                activate_kindle()
+                geom = get_window_geometry()
+                png_path = out_dir / f"page_{i:03d}.png"
+                capture_rect(geom, png_path)
+            except Exception:
+                logger.exception(
+                    "page %d/%d capture failed (captured so far: %d, out_dir=%s)",
+                    i,
+                    config.pages,
+                    len(captured),
+                    out_dir,
+                )
+                raise
 
             if auto_stop:
                 current_hash = _image_hash(png_path)
                 if current_hash == last_hash:
                     png_path.unlink(missing_ok=True)
-                    print(
-                        f"終端を検出（前ページと同一）。{len(captured)} ページで停止",
-                        flush=True,
-                    )
+                    logger.info("終端を検出（前ページと同一）。%d ページで停止", len(captured))
                     break
                 last_hash = current_hash
 
@@ -118,14 +128,15 @@ def _capture_book(
                 send_next_page(config.direction)
                 sleep(config.wait)
     except KeyboardInterrupt:
-        print(
-            f"\n中断しました。{len(captured)}/{config.pages} ページまで撮影済み。"
-            " PNG は保持し、PDF は作成しません。"
+        logger.warning(
+            "中断しました。%d/%d ページまで撮影済み。PNG は保持し、PDF は作成しません。",
+            len(captured),
+            config.pages,
         )
         return
 
     if not captured:
-        print(f"撮影 0 ページ。{config.name} の PDF はスキップ", flush=True)
+        logger.warning("撮影 0 ページ。%s の PDF はスキップ", config.name)
         return
 
     pdf_path = config.out / f"{config.name}.pdf"
@@ -142,7 +153,7 @@ def _capture_book(
         with contextlib.suppress(OSError):
             out_dir.rmdir()
 
-    print(f"完了: {pdf_path}")
+    logger.info("完了: %s", pdf_path)
 
 
 def _run_dry(config: CaptureConfig) -> None:
@@ -150,8 +161,8 @@ def _run_dry(config: CaptureConfig) -> None:
     geom = get_window_geometry()
     dry_path = config.out / "dry_run.png"
     capture_rect(geom, dry_path)
-    print(f"window geometry: x={geom.x} y={geom.y} w={geom.width} h={geom.height}")
-    print(f"saved: {dry_path}")
+    logger.info("window geometry: x=%d y=%d w=%d h=%d", geom.x, geom.y, geom.width, geom.height)
+    logger.info("saved: %s", dry_path)
 
 
 def _purge_old_pages(out_dir: Path) -> None:

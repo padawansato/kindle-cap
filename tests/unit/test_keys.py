@@ -1,9 +1,12 @@
+import logging
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from kindle_cap.config import Direction
 from kindle_cap.keys import (
+    KeystrokeError,
     _build_keystroke_script,
     _key_code_for,
     send_next_page,
@@ -85,3 +88,76 @@ def test_send_next_page_ltr_passes_left_arrow_script(mock_run: MagicMock) -> Non
 def test_send_next_page_uses_check_true(mock_run: MagicMock) -> None:
     send_next_page(Direction.RTL)
     assert mock_run.call_args.kwargs.get("check") is True
+
+
+# ---------------------------------------------------------------------------
+# CalledProcessError → custom exception ラップ + logger (issue #62)
+# ---------------------------------------------------------------------------
+
+
+def _make_called_process_error(
+    stderr: str | None, returncode: int = 1
+) -> subprocess.CalledProcessError:
+    return subprocess.CalledProcessError(
+        returncode=returncode,
+        cmd=["osascript", "-e", "..."],
+        output="",
+        stderr=stderr,
+    )
+
+
+def test_keystroke_error_is_runtime_error_subclass() -> None:
+    assert issubclass(KeystrokeError, RuntimeError)
+
+
+@patch("kindle_cap.keys.subprocess.run")
+def test_send_next_page_captures_output(mock_run: MagicMock) -> None:
+    """既存挙動からの変更点として、capture_output=True が指定される。"""
+    send_next_page(Direction.RTL)
+    assert mock_run.call_args.kwargs.get("capture_output") is True
+    assert mock_run.call_args.kwargs.get("text") is True
+
+
+@patch("kindle_cap.keys.subprocess.run")
+def test_send_next_page_wraps_called_process_error_with_stderr(
+    mock_run: MagicMock,
+) -> None:
+    mock_run.side_effect = _make_called_process_error(
+        "execution error: process Kindle isn't running (-1719)"
+    )
+    with pytest.raises(KeystrokeError, match="isn't running"):
+        send_next_page(Direction.RTL)
+
+
+@patch("kindle_cap.keys.subprocess.run")
+def test_send_next_page_includes_exit_code_in_message(mock_run: MagicMock) -> None:
+    mock_run.side_effect = _make_called_process_error("err", returncode=2)
+    with pytest.raises(KeystrokeError, match="exit 2"):
+        send_next_page(Direction.RTL)
+
+
+@patch("kindle_cap.keys.subprocess.run")
+def test_send_next_page_handles_empty_stderr(mock_run: MagicMock) -> None:
+    mock_run.side_effect = _make_called_process_error("")
+    with pytest.raises(KeystrokeError, match="no stderr"):
+        send_next_page(Direction.RTL)
+
+
+@patch("kindle_cap.keys.subprocess.run")
+def test_send_next_page_handles_none_stderr(mock_run: MagicMock) -> None:
+    mock_run.side_effect = _make_called_process_error(None)
+    with pytest.raises(KeystrokeError, match="no stderr"):
+        send_next_page(Direction.RTL)
+
+
+@patch("kindle_cap.keys.subprocess.run")
+def test_send_next_page_logs_error_on_failure(
+    mock_run: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_run.side_effect = _make_called_process_error("keystroke oops")
+    caplog.set_level(logging.ERROR, logger="kindle_cap")
+    with pytest.raises(KeystrokeError):
+        send_next_page(Direction.RTL)
+    assert "keystroke osascript failed" in caplog.text
+    assert "keystroke oops" in caplog.text

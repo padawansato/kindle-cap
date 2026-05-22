@@ -1,24 +1,60 @@
 """Typer-based CLI entry points for kindle_cap."""
 
+import logging
 import re
+import sys
 from pathlib import Path
 
 import typer
 
 from .config import CaptureConfig, Direction
+from .keys import KeystrokeError
 from .orchestrator import run as orchestrator_run
 from .pdf import PdfBuildError, build_pdf
 from .preflight import PreflightError
+from .window import KindleActivationError, WindowGeometryError
+
+logger = logging.getLogger(__name__)
 
 # `page_{n:03d}.png` で生成された PNG を **数値順** に並べるためのキー。
 # 書籍が 1000 ページを超えると 3 桁と 4 桁が混在し、辞書順 sort では
 # `page_1000.png` が `page_101.png` より先に来てしまうため数値で比較する。
 _PAGE_NUM_RE = re.compile(r"page_(\d+)\.png$")
+_LOG_FORMAT = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
 
 
 def _page_num(p: Path) -> int:
     m = _PAGE_NUM_RE.match(p.name)
     return int(m.group(1)) if m else 0
+
+
+def _setup_logging(*, verbose: bool, quiet: bool, log_file: Path | None) -> None:
+    """`kindle_cap` ロガーに StreamHandler (stderr) と optional FileHandler を attach。
+
+    `logging.basicConfig` は root logger を触るため避け、`kindle_cap` 名前空間
+    のみ操作する。既存ハンドラはクリアしてから設定 (同一プロセス内での再呼出に対応)。"""
+    if verbose and quiet:
+        raise typer.BadParameter(
+            "--verbose と --quiet は同時指定できません",
+            param_hint="--verbose / --quiet",
+        )
+    level = logging.DEBUG if verbose else (logging.WARNING if quiet else logging.INFO)
+
+    logger = logging.getLogger("kindle_cap")
+    logger.setLevel(level)
+    for handler in logger.handlers[:]:
+        handler.close()
+        logger.removeHandler(handler)
+
+    formatter = logging.Formatter(_LOG_FORMAT)
+    stream_handler = logging.StreamHandler(sys.stderr)
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
+    if log_file is not None:
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
 
 def capture(
@@ -73,7 +109,25 @@ def capture(
             "表示 (1000+ ページ書籍向け、issue #53)"
         ),
     ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="DEBUG レベルログを有効化（osascript の cmd/stdout/stderr が見える）",
+    ),
+    quiet: bool = typer.Option(
+        False,
+        "--quiet",
+        "-q",
+        help="WARNING 以上のみ出力（進捗ログを抑制）",
+    ),
+    log_file: Path | None = typer.Option(
+        None,
+        "--log-file",
+        help="指定時はログをファイルにも記録（長時間ジョブの保険）",
+    ),
 ) -> None:
+    _setup_logging(verbose=verbose, quiet=quiet, log_file=log_file)
     if direction is not None and auto_direction:
         raise typer.BadParameter(
             "--direction と --auto-direction は同時指定できません",
@@ -109,11 +163,14 @@ def capture(
             auto_stop=auto_stop,
             auto_direction=auto_direction,
         )
-    except PreflightError as e:
-        typer.echo(f"[エラー] {e}", err=True)
-        raise typer.Exit(code=1) from e
-    except PdfBuildError as e:
-        typer.echo(f"[エラー] {e}", err=True)
+    except (
+        PreflightError,
+        PdfBuildError,
+        WindowGeometryError,
+        KindleActivationError,
+        KeystrokeError,
+    ) as e:
+        logger.error("%s", e)
         raise typer.Exit(code=1) from e
 
 
@@ -141,7 +198,25 @@ def rebuild_pdf(
             "表示 (1000+ ページ書籍向け、issue #53)"
         ),
     ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="DEBUG レベルログを有効化",
+    ),
+    quiet: bool = typer.Option(
+        False,
+        "--quiet",
+        "-q",
+        help="WARNING 以上のみ出力",
+    ),
+    log_file: Path | None = typer.Option(
+        None,
+        "--log-file",
+        help="指定時はログをファイルにも記録",
+    ),
 ) -> None:
+    _setup_logging(verbose=verbose, quiet=quiet, log_file=log_file)
     pngs = sorted(directory.glob("page_*.png"), key=_page_num)
     if not pngs:
         typer.echo(f"[エラー] {directory} に page_*.png が見つかりません", err=True)
@@ -149,13 +224,10 @@ def rebuild_pdf(
     out_path = directory.parent / f"{directory.name}.pdf"
     try:
         build_pdf(pngs, out_path, jpeg_quality=pdf_jpeg_quality, progress=progress)
-    except PdfBuildError as e:
-        typer.echo(f"[エラー] {e}", err=True)
+    except (PdfBuildError, ValueError) as e:
+        logger.error("%s", e)
         raise typer.Exit(code=1) from e
-    except ValueError as e:
-        typer.echo(f"[エラー] {e}", err=True)
-        raise typer.Exit(code=1) from e
-    typer.echo(f"PDF を作成しました: {out_path}")
+    logger.info("PDF を作成しました: %s", out_path)
 
 
 def run_capture() -> None:
