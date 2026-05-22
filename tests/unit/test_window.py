@@ -1,9 +1,13 @@
+import logging
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from kindle_cap.config import Geometry
 from kindle_cap.window import (
+    KindleActivationError,
+    WindowGeometryError,
     _parse_geometry_output,
     activate_kindle,
     get_window_geometry,
@@ -123,3 +127,118 @@ def test_get_window_geometry_propagates_parse_error(mock_run: MagicMock) -> None
     mock_run.return_value = MagicMock(stdout="garbage\n")
     with pytest.raises(RuntimeError):
         get_window_geometry()
+
+
+# ---------------------------------------------------------------------------
+# CalledProcessError → custom exception ラップ + logger (issue #62)
+# ---------------------------------------------------------------------------
+
+
+def _make_called_process_error(
+    stderr: str | None, returncode: int = 1
+) -> subprocess.CalledProcessError:
+    return subprocess.CalledProcessError(
+        returncode=returncode,
+        cmd=["osascript", "-e", "..."],
+        output="",
+        stderr=stderr,
+    )
+
+
+def test_window_geometry_error_is_runtime_error_subclass() -> None:
+    assert issubclass(WindowGeometryError, RuntimeError)
+
+
+def test_kindle_activation_error_is_runtime_error_subclass() -> None:
+    assert issubclass(KindleActivationError, RuntimeError)
+
+
+@patch("kindle_cap.window.subprocess.run")
+def test_get_window_geometry_wraps_called_process_error_with_stderr(
+    mock_run: MagicMock,
+) -> None:
+    mock_run.side_effect = _make_called_process_error(
+        "execution error: process Kindle isn't running (-1719)"
+    )
+    with pytest.raises(WindowGeometryError, match="isn't running"):
+        get_window_geometry()
+
+
+@patch("kindle_cap.window.subprocess.run")
+def test_get_window_geometry_includes_exit_code_in_message(mock_run: MagicMock) -> None:
+    mock_run.side_effect = _make_called_process_error("some error", returncode=2)
+    with pytest.raises(WindowGeometryError, match="exit 2"):
+        get_window_geometry()
+
+
+@patch("kindle_cap.window.subprocess.run")
+def test_get_window_geometry_handles_empty_stderr(mock_run: MagicMock) -> None:
+    mock_run.side_effect = _make_called_process_error("")
+    with pytest.raises(WindowGeometryError, match="no stderr"):
+        get_window_geometry()
+
+
+@patch("kindle_cap.window.subprocess.run")
+def test_get_window_geometry_handles_none_stderr(mock_run: MagicMock) -> None:
+    mock_run.side_effect = _make_called_process_error(None)
+    with pytest.raises(WindowGeometryError, match="no stderr"):
+        get_window_geometry()
+
+
+@patch("kindle_cap.window.subprocess.run")
+def test_get_window_geometry_logs_error_on_failure(
+    mock_run: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_run.side_effect = _make_called_process_error("oops")
+    caplog.set_level(logging.ERROR, logger="kindle_cap")
+    with pytest.raises(WindowGeometryError):
+        get_window_geometry()
+    assert "geometry osascript failed" in caplog.text
+    assert "oops" in caplog.text
+
+
+@patch("kindle_cap.window.subprocess.run")
+def test_activate_kindle_captures_output(mock_run: MagicMock) -> None:
+    """既存挙動からの変更点として、capture_output=True が指定される。"""
+    activate_kindle()
+    assert mock_run.call_args.kwargs.get("capture_output") is True
+    assert mock_run.call_args.kwargs.get("text") is True
+
+
+@patch("kindle_cap.window.subprocess.run")
+def test_activate_kindle_wraps_called_process_error_with_stderr(
+    mock_run: MagicMock,
+) -> None:
+    mock_run.side_effect = _make_called_process_error(
+        "execution error: Application isn't running (-600)"
+    )
+    with pytest.raises(KindleActivationError, match="isn't running"):
+        activate_kindle()
+
+
+@patch("kindle_cap.window.subprocess.run")
+def test_activate_kindle_includes_exit_code_in_message(mock_run: MagicMock) -> None:
+    mock_run.side_effect = _make_called_process_error("err", returncode=3)
+    with pytest.raises(KindleActivationError, match="exit 3"):
+        activate_kindle()
+
+
+@patch("kindle_cap.window.subprocess.run")
+def test_activate_kindle_handles_empty_stderr(mock_run: MagicMock) -> None:
+    mock_run.side_effect = _make_called_process_error("")
+    with pytest.raises(KindleActivationError, match="no stderr"):
+        activate_kindle()
+
+
+@patch("kindle_cap.window.subprocess.run")
+def test_activate_kindle_logs_error_on_failure(
+    mock_run: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_run.side_effect = _make_called_process_error("activation oops")
+    caplog.set_level(logging.ERROR, logger="kindle_cap")
+    with pytest.raises(KindleActivationError):
+        activate_kindle()
+    assert "Kindle activation failed" in caplog.text
+    assert "activation oops" in caplog.text
