@@ -667,6 +667,85 @@ def test_run_with_direction_none_and_auto_direction_false_raises(
         run(config, auto_direction=False)
 
 
+# ---------------------------------------------------------------------------
+# 振る舞いベース: --auto-direction で表紙ページが page_001.png として残ること (issue #59)
+# ---------------------------------------------------------------------------
+
+
+def _detect_stub_with_cover(direction: Direction, num_pngs: int, cover_bytes: bytes) -> Any:
+    """detect_direction の挙動を模倣: page_001=表紙、page_002..N が probe 後のページ。"""
+
+    def _stub(*, out_dir: Path, **_kwargs: Any) -> tuple[Direction, list[Path]]:
+        pngs = []
+        cover = out_dir / "page_001.png"
+        cover.write_bytes(cover_bytes)
+        pngs.append(cover)
+        for i in range(2, num_pngs + 1):
+            p = out_dir / f"page_{i:03d}.png"
+            p.write_bytes(f"probe-{i}".encode())
+            pngs.append(p)
+        return (direction, pngs)
+
+    return _stub
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+@patch("kindle_cap.orchestrator.detect_direction")
+def test_run_auto_direction_pdf_includes_cover_as_first_page(
+    mock_detect: MagicMock,
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
+    """auto_direction 成功時、PDF 入力の先頭は detect が撮った表紙 (page_001.png)"""
+    mock_geom.return_value = _GEOM
+    mock_detect.side_effect = _detect_stub_with_cover(Direction.RTL, 4, b"COVER")
+    mock_cap.side_effect = lambda g, p: p.write_bytes(b"new")
+    config = _config(tmp_path, pages=6, direction=None)
+    run(config, auto_direction=True)
+    pdf_inputs = mock_pdf.call_args[0][0]
+    assert pdf_inputs[0].name == "page_001.png"
+    assert pdf_inputs[0].read_bytes() == b"COVER"
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+@patch("kindle_cap.orchestrator.detect_direction")
+def test_run_auto_direction_fallback_pdf_includes_cover_as_first_page(
+    mock_detect: MagicMock,
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
+    """auto_direction fallback (probe 無反応) でも表紙が PDF の先頭に含まれる"""
+    mock_geom.return_value = _GEOM
+    # detect が [cover, verify] の 2 枚を返す（fallback パス）
+    mock_detect.side_effect = _detect_stub_with_cover(Direction.LTR, 2, b"COVER")
+    mock_cap.side_effect = lambda g, p: p.write_bytes(b"new")
+    config = _config(tmp_path, pages=4, direction=None)
+    run(config, auto_direction=True)
+    pdf_inputs = mock_pdf.call_args[0][0]
+    assert pdf_inputs[0].name == "page_001.png"
+    assert pdf_inputs[0].read_bytes() == b"COVER"
+
+
 @patch("kindle_cap.orchestrator.capture_rect")
 @patch("kindle_cap.orchestrator.get_window_geometry")
 @patch("kindle_cap.orchestrator.activate_kindle")

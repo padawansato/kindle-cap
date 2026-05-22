@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `--auto-direction` 経路で起点フレーム（表紙）が出力 PNG / PDF に含まれず欠落していた不具合を修正。`detect_direction()` が表紙を `_origin.png` として撮影したあと `finally` で削除し、probe direction で進めた後のフレームを `page_001.png..page_003.png` として保存していたのが原因。表紙を `page_001.png` として保持し、probe を `page_002.png..page_004.png` に変更。fallback 経路 (probe 無反応 → 逆方向 verify) でも `page_001.png` を表紙、`page_002.png` を verify として残す。「`page_001.png` のハッシュが起点フレームと一致する」という振る舞いベースのテストが欠落していたためレビューを素通りしていた点もテストで補強した (issue #59)
+
 ## [0.2.0] - 2026-05-20
 
 ### Added
