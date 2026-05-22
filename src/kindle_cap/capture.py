@@ -1,11 +1,14 @@
 """Capture a screen rectangle using macOS screencapture."""
 
+import logging
 import subprocess
 from pathlib import Path
 
 from PIL import Image
 
 from .config import Geometry
+
+logger = logging.getLogger(__name__)
 
 
 class CaptureError(RuntimeError):
@@ -30,15 +33,22 @@ def _flatten_alpha(path: Path) -> None:
 
 
 def capture_rect(geom: Geometry, out_path: Path) -> None:
+    args = _build_screencapture_args(geom, out_path)
+    logger.debug("screencapture: %s", " ".join(args))
     # macOS の screencapture は書き込み失敗時でも exit 0 で抜けることがあるため、
     # check=True に頼らず out_path の存在を確認する。stderr は診断のため捕捉する。
     result = subprocess.run(
-        _build_screencapture_args(geom, out_path),
+        args,
         check=True,
         capture_output=True,
         text=True,
     )
     if not out_path.exists():
         stderr_text = (result.stderr or "").strip() or "(no stderr)"
+        logger.error(
+            "screencapture succeeded but file missing: %s (stderr: %s)",
+            out_path,
+            stderr_text,
+        )
         raise CaptureError(f"screencapture exited 0 but did not create {out_path}: {stderr_text}")
     _flatten_alpha(out_path)

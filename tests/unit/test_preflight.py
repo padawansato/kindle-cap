@@ -1,3 +1,4 @@
+import logging
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -11,6 +12,7 @@ from kindle_cap.preflight import (
     PreflightError,
     _is_accessibility_error,
     _parse_count,
+    _run_oscript,
     detect_direction,
     preflight,
 )
@@ -348,3 +350,51 @@ def test_detect_direction_error_removes_cover_too(tmp_path: Path) -> None:
     with pytest.raises(PreflightError):
         detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
     assert not (tmp_path / "page_001.png").exists()
+
+
+# ---------------------------------------------------------------------------
+# _run_oscript のロギング (issue #62)
+# ---------------------------------------------------------------------------
+
+
+@patch("kindle_cap.preflight.subprocess.run")
+def test_run_oscript_logs_script_on_invocation(
+    mock_run: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """_run_oscript は呼び出し時に script を debug ログに残す"""
+    mock_run.return_value = MagicMock(stdout="Finder\n")
+    caplog.set_level(logging.DEBUG, logger="kindle_cap")
+    _run_oscript('tell application "System Events" to get name of first process')
+    assert "preflight osascript" in caplog.text
+    assert "System Events" in caplog.text
+
+
+@patch("kindle_cap.preflight.subprocess.run")
+def test_run_oscript_logs_stderr_on_failure_and_reraises(
+    mock_run: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """_run_oscript は失敗時に stderr を debug ログに残してから例外を再送出する。
+    (呼び出し側 _can_send_keystrokes で stderr 判定するため raise 自体は素通し)"""
+    err = subprocess.CalledProcessError(2, "osascript", stderr="execution error: some failure")
+    mock_run.side_effect = err
+    caplog.set_level(logging.DEBUG, logger="kindle_cap")
+    with pytest.raises(subprocess.CalledProcessError):
+        _run_oscript('tell application "System Events" to count processes')
+    assert "preflight osascript failed" in caplog.text
+    assert "execution error" in caplog.text
+
+
+@patch("kindle_cap.preflight.subprocess.run")
+def test_run_oscript_handles_none_stderr_in_log(
+    mock_run: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """stderr=None でも debug ログでクラッシュしないこと"""
+    err = subprocess.CalledProcessError(1, "osascript", stderr=None)
+    mock_run.side_effect = err
+    caplog.set_level(logging.DEBUG, logger="kindle_cap")
+    with pytest.raises(subprocess.CalledProcessError):
+        _run_oscript("anything")
+    assert "preflight osascript failed" in caplog.text

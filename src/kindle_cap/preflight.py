@@ -1,11 +1,14 @@
 """Validate prerequisites before starting the capture loop."""
 
 import hashlib
+import logging
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
 from .config import Direction, Geometry
+
+logger = logging.getLogger(__name__)
 
 
 class PreflightError(RuntimeError):
@@ -32,12 +35,20 @@ def _is_accessibility_error(stderr: str | None) -> bool:
 
 
 def _run_oscript(script: str) -> str:
-    result = subprocess.run(
-        ["osascript", "-e", script],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    logger.debug("preflight osascript: %s", script)
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        stderr_text = (e.stderr or "").strip() or "(no stderr)"
+        # 呼び出し側 _can_send_keystrokes で stderr 判定するため raise 自体は素通し。
+        # ただし debug ログには必ず stderr を残す。
+        logger.debug("preflight osascript failed (exit %d): %s", e.returncode, stderr_text)
+        raise
     return result.stdout
 
 
@@ -60,6 +71,7 @@ def _can_send_keystrokes() -> bool:
 
 
 def preflight() -> None:
+    logger.debug("running preflight checks")
     if not _is_kindle_running():
         raise PreflightError("Kindle.app を起動してください（プロセスが見つかりません）")
     if not _has_kindle_window():
@@ -70,6 +82,7 @@ def preflight() -> None:
             "システム設定 > プライバシーとセキュリティ > アクセシビリティ で\n"
             "ターミナル（iTerm2 等）に許可を与えてください。"
         )
+    logger.debug("preflight checks passed")
 
 
 def _md5(path: Path) -> str:
@@ -104,6 +117,11 @@ def detect_direction(
     先頭が表紙 (page_001.png)、後続が probe direction で進めた後のフレーム。
     呼び出し側 _capture_book に start_index = len(...) + 1 / seed_hashes として渡す。
     """
+    logger.debug(
+        "detect_direction start (probe_direction=%s, probe_count=%d)",
+        probe_direction.value,
+        probe_count,
+    )
     activator()
     geom = geom_provider()
     cover_path = out_dir / "page_001.png"
@@ -123,9 +141,11 @@ def detect_direction(
 
         if _md5(probe_pngs[-1]) != cover_hash:
             keep_cover = True
+            logger.debug("detect_direction resolved: %s", probe_direction.value)
             return probe_direction, [cover_path, *probe_pngs]
 
         # probe 無反応 → 試写を全削除して逆方向で確認
+        logger.debug("probe direction %s unresponsive, trying fallback", probe_direction.value)
         for p in probe_pngs:
             p.unlink(missing_ok=True)
         other = Direction.LTR if probe_direction is Direction.RTL else Direction.RTL
@@ -137,6 +157,7 @@ def detect_direction(
         capturer(geom, verify_path)
         if _md5(verify_path) != cover_hash:
             keep_cover = True
+            logger.debug("detect_direction resolved (fallback): %s", other.value)
             return other, [cover_path, verify_path]
         verify_path.unlink(missing_ok=True)
 

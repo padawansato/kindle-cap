@@ -1,3 +1,4 @@
+import logging
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -238,3 +239,39 @@ def test_capture_rect_error_includes_out_path(
     mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
     with pytest.raises(CaptureError, match=r"page_153\.png"):
         capture_rect(Geometry(0, 0, 10, 10), out)
+
+
+# ---------------------------------------------------------------------------
+# capture_rect のロギング (issue #62)
+# ---------------------------------------------------------------------------
+
+
+@patch("kindle_cap.capture.subprocess.run")
+def test_capture_rect_logs_screencapture_command(
+    mock_run: MagicMock,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    out = tmp_path / "p.png"
+    mock_run.side_effect = _stub_screencapture_factory(out)
+    caplog.set_level(logging.DEBUG, logger="kindle_cap")
+    capture_rect(Geometry(10, 20, 30, 40), out)
+    assert "screencapture" in caplog.text
+    assert "10,20,30,40" in caplog.text
+
+
+@patch("kindle_cap.capture.subprocess.run")
+def test_capture_rect_logs_error_when_file_missing(
+    mock_run: MagicMock,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    out = tmp_path / "missing.png"
+    mock_run.return_value = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout="", stderr="screencapture: cannot write file"
+    )
+    caplog.set_level(logging.ERROR, logger="kindle_cap")
+    with pytest.raises(CaptureError):
+        capture_rect(Geometry(0, 0, 10, 10), out)
+    assert "screencapture succeeded but file missing" in caplog.text
+    assert "cannot write file" in caplog.text
