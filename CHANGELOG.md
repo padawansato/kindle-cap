@@ -4,6 +4,20 @@
 
 ## [Unreleased]
 
+### Added
+
+- `kindle-cap` / `kindle-cap-pdf` に `--verbose` (`-v`) / `--quiet` (`-q`) / `--log-file PATH` CLI オプション。それぞれ DEBUG レベル有効化 / WARNING 以上のみ出力 / ログをファイルにも記録（issue #62）
+- `logging` モジュール導入（`kindle_cap` パッケージ全体）。フォーマット: `%(asctime)s %(levelname)-7s %(name)s: %(message)s`。`StreamHandler` (stderr) + optional `FileHandler` でレベル別に出力（issue #62）
+- 新規 custom exception 3 種: `kindle_cap.window.WindowGeometryError` / `kindle_cap.window.KindleActivationError` / `kindle_cap.keys.KeystrokeError`。いずれも `RuntimeError` サブクラス。subprocess osascript の失敗時、`subprocess.CalledProcessError` を捕捉して stderr 込みの具体的メッセージで raise する（issue #62）
+
+### Changed
+
+- `kindle_cap.window.activate_kindle` / `kindle_cap.keys.send_next_page` で `capture_output=True` を有効化し、`subprocess.CalledProcessError` 発生時に stderr を例外メッセージ + `logger.error` に含めるようにした。従来は stderr が握り潰されており、`exit 1` しか Traceback に残らなかった（issue #62）
+- `kindle_cap.window.get_window_geometry`: `subprocess.CalledProcessError` 発生時に `WindowGeometryError` (stderr 込み) で raise するように変更。`_parse_geometry_output` が投げていた `RuntimeError` も `WindowGeometryError` に統一（issue #62）
+- `kindle_cap.preflight._run_oscript`: 失敗時に stderr を `logger.debug` に残してから例外を再送出（`_can_send_keystrokes` の stderr 判定経路は維持、issue #62）
+- `kindle_cap.orchestrator._capture_book` のループ内で撮影 step が失敗したとき、`logger.exception` で `page N/M` + `captured so far: K` + `out_dir` を context として記録してから例外を再送出するように変更。2000 ページ撮影のような長時間ジョブで途中失敗したときの原因特定が容易になる（issue #62）
+- `kindle-cap` / `kindle-cap-pdf` の進捗 / 完了メッセージを `print()` から `logger.info` 経由に移行。`--quiet` で抑制可能。エラー表示も `typer.echo("[エラー] ...", err=True)` から `logger.error` に統一（issue #62）
+
 ## [0.2.1] - 2026-05-22
 
 ### Fixed
