@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-22
+
 ### Added
 
 - `kindle-cap` / `kindle-cap-pdf` に `--verbose` (`-v`) / `--quiet` (`-q`) / `--log-file PATH` CLI オプション。それぞれ DEBUG レベル有効化 / WARNING 以上のみ出力 / ログをファイルにも記録（issue #62）
@@ -84,7 +86,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/padawansato/kindle-cap/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/padawansato/kindle-cap/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/padawansato/kindle-cap/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/padawansato/kindle-cap/releases/tag/v0.1.0
