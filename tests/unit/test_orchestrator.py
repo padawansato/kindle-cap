@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -7,6 +8,7 @@ import pytest
 from kindle_cap.config import CaptureConfig, Direction, Geometry
 from kindle_cap.orchestrator import _capture_book, _image_hash, run
 from kindle_cap.preflight import PreflightError
+from kindle_cap.window import WindowGeometryError
 
 _GEOM = Geometry(x=0, y=0, width=100, height=100)
 
@@ -199,15 +201,15 @@ def test_run_prints_progress_for_each_page(
     mock_send: MagicMock,
     mock_pdf: MagicMock,
     tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """長尺キャプチャの UX として、各ページごとに進捗を出すこと"""
+    """長尺キャプチャの UX として、各ページごとに進捗ログを出すこと"""
     mock_geom.return_value = _GEOM
+    caplog.set_level(logging.INFO, logger="kindle_cap")
     run(_config(tmp_path, pages=3))
-    out = capsys.readouterr().out
-    assert "1/3" in out
-    assert "2/3" in out
-    assert "3/3" in out
+    assert "1/3" in caplog.text
+    assert "2/3" in caplog.text
+    assert "3/3" in caplog.text
 
 
 @patch("kindle_cap.orchestrator.build_pdf")
@@ -224,13 +226,13 @@ def test_run_progress_reflects_actual_page_count(
     mock_send: MagicMock,
     mock_pdf: MagicMock,
     tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """N ページ指定なら 'N/N' まで含まれること（最終ページの進捗が抜けないこと）"""
     mock_geom.return_value = _GEOM
+    caplog.set_level(logging.INFO, logger="kindle_cap")
     run(_config(tmp_path, pages=10))
-    out = capsys.readouterr().out
-    assert "10/10" in out
+    assert "10/10" in caplog.text
 
 
 @patch("kindle_cap.orchestrator.build_pdf")
@@ -247,13 +249,13 @@ def test_run_dry_run_does_not_print_progress_count(
     mock_send: MagicMock,
     mock_pdf: MagicMock,
     tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """dry-run はループしないので 1/N 形式の進捗は出ない"""
     mock_geom.return_value = _GEOM
+    caplog.set_level(logging.INFO, logger="kindle_cap")
     run(_config(tmp_path, pages=1), dry_run=True)
-    out = capsys.readouterr().out
-    assert "1/1" not in out
+    assert "1/1" not in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -765,3 +767,85 @@ def test_run_dry_run_with_auto_direction_skips_detect(
     run(config, dry_run=True, auto_direction=True)
     assert not mock_detect.called
     assert mock_cap.call_count == 1  # _run_dry の 1 枚撮影のみ
+
+
+# ---------------------------------------------------------------------------
+# _capture_book ループ内の例外時 context ロギング (issue #62)
+# ---------------------------------------------------------------------------
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_logs_page_context_on_geometry_failure(
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """get_window_geometry が 3 ページ目で失敗したとき、page 3/5 + 撮影済み 2 ページが log に残る"""
+    mock_geom.side_effect = [
+        _GEOM,
+        _GEOM,
+        WindowGeometryError("osascript geometry probe failed (exit 1): isn't running"),
+    ]
+    caplog.set_level(logging.ERROR, logger="kindle_cap")
+    with pytest.raises(WindowGeometryError):
+        run(_config(tmp_path, pages=5))
+    assert "page 3/5" in caplog.text
+    assert "captured so far: 2" in caplog.text
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_propagates_geometry_error_after_logging(
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
+    """ループ内例外は logger に context 出してから raise される (PDF は作らない)"""
+    mock_geom.side_effect = [_GEOM, WindowGeometryError("boom")]
+    with pytest.raises(WindowGeometryError, match="boom"):
+        run(_config(tmp_path, pages=5))
+    mock_pdf.assert_not_called()
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_keyboard_interrupt_path_does_not_trigger_failure_log(
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """KeyboardInterrupt は既存のループ外 except でハンドリングされ、
+    page capture failed の error ログは出ない (Ctrl-C は失敗ではない)"""
+    mock_geom.return_value = _GEOM
+    mock_cap.side_effect = [None, KeyboardInterrupt(), None]
+    caplog.set_level(logging.ERROR, logger="kindle_cap")
+    run(_config(tmp_path, pages=5))
+    assert "capture failed" not in caplog.text
+    mock_pdf.assert_not_called()
