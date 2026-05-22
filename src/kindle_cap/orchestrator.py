@@ -32,7 +32,7 @@ def run(
         out_dir.mkdir(parents=True, exist_ok=True)
         _purge_old_pages(out_dir)
 
-        resolved_direction, probe_pngs = detect_direction(
+        resolved_direction, initial_pngs = detect_direction(
             out_dir=out_dir,
             geom_provider=get_window_geometry,
             activator=activate_kindle,
@@ -43,16 +43,13 @@ def run(
         )
         resolved_config = dataclasses.replace(config, direction=resolved_direction)
 
-        if probe_pngs:
-            seed_hashes = [_image_hash(p) for p in probe_pngs]
-            _capture_book(
-                resolved_config,
-                auto_stop=auto_stop,
-                start_index=len(probe_pngs) + 1,
-                seed_hashes=seed_hashes,
-            )
-        else:
-            _capture_book(resolved_config, auto_stop=auto_stop)
+        seed_hashes = [_image_hash(p) for p in initial_pngs]
+        _capture_book(
+            resolved_config,
+            auto_stop=auto_stop,
+            start_index=len(initial_pngs) + 1,
+            seed_hashes=seed_hashes,
+        )
         return
 
     if config.direction is None:

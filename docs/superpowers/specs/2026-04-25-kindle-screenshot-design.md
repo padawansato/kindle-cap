@@ -269,7 +269,7 @@ CI ではユニットのみ。integration はローカル手動。
 - 自動トリミング（実コンテンツ領域の検出）
 - 見開き分割（左右ページの分離）
 - ライブラリ画面からの一括キャプチャ（PR #4 で `--from-library` として試行 → 実機検証で Kindle for Mac の制約により断念。再挑戦するなら GUI オートメーション前提の別アプローチが必要）
-- `--auto-direction`：最初の数ページで矢印キーを試して進む方を採用（Kindle for Mac の direction が紙の綴じ方向と一致しないケースがあるため）
+- `--auto-direction`：最初の数ページで矢印キーを試して進む方を採用（Kindle for Mac の direction が紙の綴じ方向と一致しないケースがあるため）→ 実装済み (issue #15)。`detect_direction()` が起点フレームを `page_001.png` として保持し、probe direction で進めた後のフレームを `page_002..page_004.png` として撮影、本撮影に流用する。表紙保持は issue #59 で修正
 
 ## 12. 実装順序の推奨
 

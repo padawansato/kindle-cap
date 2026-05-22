@@ -200,28 +200,17 @@ def _detect_kwargs(tmp_path: Path, **overrides: Any) -> dict[str, Any]:
 def test_detect_direction_returns_probe_direction_when_pages_advance(
     tmp_path: Path,
 ) -> None:
-    """起点 != 試写3 のシーケンス → probe_direction (RTL) を返し、試写を本番採用"""
+    """起点 != 試写3 → probe_direction (RTL) を返し、表紙＋試写を本番採用"""
     cap = _capturer_writing_seq([b"origin", b"p1", b"p2", b"p3"])
     direction, pngs = detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
     assert direction is Direction.RTL
-    assert [p.name for p in pngs] == ["page_001.png", "page_002.png", "page_003.png"]
+    assert [p.name for p in pngs] == [
+        "page_001.png",
+        "page_002.png",
+        "page_003.png",
+        "page_004.png",
+    ]
     assert all(p.exists() for p in pngs)
-
-
-def test_detect_direction_returns_probe_pngs_named_page_001_to_003(
-    tmp_path: Path,
-) -> None:
-    cap = _capturer_writing_seq([b"o", b"a", b"b", b"c"])
-    _, pngs = detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
-    assert pngs[0] == tmp_path / "page_001.png"
-    assert pngs[1] == tmp_path / "page_002.png"
-    assert pngs[2] == tmp_path / "page_003.png"
-
-
-def test_detect_direction_unlinks_origin_png_on_success(tmp_path: Path) -> None:
-    cap = _capturer_writing_seq([b"o", b"a", b"b", b"c"])
-    detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
-    assert not (tmp_path / "_origin.png").exists()
 
 
 def test_detect_direction_calls_sender_three_times_for_probe(tmp_path: Path) -> None:
@@ -239,7 +228,7 @@ def test_detect_direction_default_probe_direction_is_rtl(tmp_path: Path) -> None
 
 
 def test_detect_direction_uses_probe_count_parameter(tmp_path: Path) -> None:
-    """probe_count=5 を渡せば 5 枚撮る。"""
+    """probe_count=5 を渡せば 5 回送信し、表紙＋5 枚 = 6 枚を返す。"""
     cap = _capturer_writing_seq([b"o", b"1", b"2", b"3", b"4", b"5"])
     sender = MagicMock()
     direction, pngs = detect_direction(
@@ -247,33 +236,34 @@ def test_detect_direction_uses_probe_count_parameter(tmp_path: Path) -> None:
         probe_count=5,
     )
     assert direction is Direction.RTL
-    assert len(pngs) == 5
+    assert len(pngs) == 6  # 表紙 (page_001) + probe 5 枚 (page_002..006)
     assert sender.call_count == 5
 
 
 def test_detect_direction_falls_back_to_other_direction_when_no_advance(
     tmp_path: Path,
 ) -> None:
-    """起点 == 試写3（無反応）、verify では変化あり → other_direction を返し試写は破棄。"""
+    """起点 == 試写3（無反応）、verify では変化あり → other_direction を返す。
+    戻り値は [表紙=page_001, verify=page_002] の 2 枚。"""
     cap = _capturer_writing_seq([b"same", b"same", b"same", b"same", b"changed"])
     sender = MagicMock()
     direction, pngs = detect_direction(
         **_detect_kwargs(tmp_path, capturer=cap, sender=sender),
     )
     assert direction is Direction.LTR
-    assert pngs == []
+    assert [p.name for p in pngs] == ["page_001.png", "page_002.png"]
     assert sender.call_args_list[-1].args[0] is Direction.LTR
 
 
-def test_detect_direction_unlinks_probe_pngs_on_fallback(tmp_path: Path) -> None:
-    """fallback 時、試写 PNG / _origin / _verify がすべて削除される。"""
+def test_detect_direction_discards_probe_pngs_on_fallback(tmp_path: Path) -> None:
+    """fallback 時、probe で撮った中間ページ (page_003/004) は削除されるが
+    page_001 (表紙) と page_002 (verify) は残る。"""
     cap = _capturer_writing_seq([b"same", b"same", b"same", b"same", b"changed"])
     detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
-    assert not (tmp_path / "page_001.png").exists()
-    assert not (tmp_path / "page_002.png").exists()
-    assert not (tmp_path / "page_003.png").exists()
-    assert not (tmp_path / "_origin.png").exists()
-    assert not (tmp_path / "_verify.png").exists()
+    assert (tmp_path / "page_001.png").exists()  # 表紙は残す
+    assert (tmp_path / "page_002.png").exists()  # verify は残す
+    assert not (tmp_path / "page_003.png").exists()  # 無反応 probe は削除
+    assert not (tmp_path / "page_004.png").exists()
 
 
 def test_detect_direction_raises_preflight_error_when_both_directions_unresponsive(
@@ -300,3 +290,61 @@ def test_detect_direction_error_path_leaves_no_files(tmp_path: Path) -> None:
     with pytest.raises(PreflightError):
         detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
     assert list(tmp_path.glob("*.png")) == []
+
+
+# ---------------------------------------------------------------------------
+# 振る舞いベース: cover が page_001.png として最終出力に残ること (issue #59)
+# ---------------------------------------------------------------------------
+
+
+def test_detect_direction_keeps_cover_as_page_001_on_success(tmp_path: Path) -> None:
+    """成功経路: 起点フレーム（表紙）が page_001.png として保持される"""
+    cap = _capturer_writing_seq([b"COVER", b"p1", b"p2", b"p3"])
+    detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
+    assert (tmp_path / "page_001.png").exists()
+    assert (tmp_path / "page_001.png").read_bytes() == b"COVER"
+
+
+def test_detect_direction_keeps_cover_as_page_001_on_fallback(tmp_path: Path) -> None:
+    """fallback 経路（probe 無反応 → 逆方向で verify）でも page_001.png は表紙のまま残る"""
+    cap = _capturer_writing_seq([b"COVER", b"COVER", b"COVER", b"COVER", b"NEXT"])
+    detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
+    assert (tmp_path / "page_001.png").exists()
+    assert (tmp_path / "page_001.png").read_bytes() == b"COVER"
+
+
+def test_detect_direction_returns_cover_first_in_pngs_on_success(tmp_path: Path) -> None:
+    """成功経路: 戻り値の最初の要素は表紙 (page_001.png)、後続が probe"""
+    cap = _capturer_writing_seq([b"COVER", b"p1", b"p2", b"p3"])
+    _, pngs = detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
+    assert pngs[0] == tmp_path / "page_001.png"
+    assert pngs[0].read_bytes() == b"COVER"
+
+
+def test_detect_direction_probe_pngs_start_at_page_002(tmp_path: Path) -> None:
+    """成功経路: probe で撮ったフレームは page_002..page_004"""
+    cap = _capturer_writing_seq([b"COVER", b"p1", b"p2", b"p3"])
+    _, pngs = detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
+    assert [p.name for p in pngs] == [
+        "page_001.png",
+        "page_002.png",
+        "page_003.png",
+        "page_004.png",
+    ]
+
+
+def test_detect_direction_fallback_returns_cover_and_verify(tmp_path: Path) -> None:
+    """fallback 経路: 戻り値は [cover (page_001), verify (page_002)] の 2 枚"""
+    cap = _capturer_writing_seq([b"COVER", b"COVER", b"COVER", b"COVER", b"NEXT"])
+    _, pngs = detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
+    assert [p.name for p in pngs] == ["page_001.png", "page_002.png"]
+    assert pngs[0].read_bytes() == b"COVER"
+    assert pngs[1].read_bytes() == b"NEXT"
+
+
+def test_detect_direction_error_removes_cover_too(tmp_path: Path) -> None:
+    """エラー経路（両方向無反応）では cover (page_001.png) も削除される"""
+    cap = _capturer_writing_seq([b"x", b"x", b"x", b"x", b"x"])
+    with pytest.raises(PreflightError):
+        detect_direction(**_detect_kwargs(tmp_path, capturer=cap))
+    assert not (tmp_path / "page_001.png").exists()

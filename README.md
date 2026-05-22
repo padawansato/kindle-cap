@@ -97,7 +97,7 @@ output/my-book.pdf
 |---|---|---|---|
 | `--pages N` | ✓ | — | 撮影ページ数の上限 |
 | `--direction rtl\|ltr` | ※ | — | `rtl`=右綴じ（右矢印で次ページ）、`ltr`=左綴じ（左矢印で次ページ） |
-| `--auto-direction` | ※ | off | 表紙起点で direction を試写判定。試写は本番に流用（重複撮影なし） |
+| `--auto-direction` | ※ | off | 表紙起点で direction を試写判定。**起点フレーム（表紙）は `page_001.png` として保存し**、試写は `page_002.png` 以降に流用（重複撮影なし） |
 | `--name NAME` | | （対話プロンプト） | 出力ディレクトリ名 |
 | `--wait SEC` | | `1.0` | ページ送り後の待機秒（重い書籍は `1.5` 推奨） |
 | `--out PATH` | | `./output` | 出力先 |
