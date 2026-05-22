@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-22
+
 ### Fixed
 
 - `--auto-direction` 経路で起点フレーム（表紙）が出力 PNG / PDF に含まれず欠落していた不具合を修正。`detect_direction()` が表紙を `_origin.png` として撮影したあと `finally` で削除し、probe direction で進めた後のフレームを `page_001.png..page_003.png` として保存していたのが原因。表紙を `page_001.png` として保持し、probe を `page_002.png..page_004.png` に変更。fallback 経路 (probe 無反応 → 逆方向 verify) でも `page_001.png` を表紙、`page_002.png` を verify として残す。「`page_001.png` のハッシュが起点フレームと一致する」という振る舞いベースのテストが欠落していたためレビューを素通りしていた点もテストで補強した (issue #59)
@@ -68,6 +70,7 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/padawansato/kindle-cap/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/padawansato/kindle-cap/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/padawansato/kindle-cap/releases/tag/v0.1.0
