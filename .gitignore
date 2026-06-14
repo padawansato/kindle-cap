@@ -17,6 +17,10 @@ experiments/
 
 # Claude Code 個人設定
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # Editor
 .vscode/
+
+# macOS
+.DS_Store
