@@ -137,10 +137,13 @@ uv run kindle-cap-pdf output/my-book --pdf-jpeg-quality 80 --progress
 # YomiToku を含めて再インストール（約 1.5GB の追加依存）
 uv sync --extra ocr
 
-# キャプチャ後に OCR を実行
-uv run kindle-cap --name my-book --pages 200 --auto-direction
-uv run book-ocr output/my-book/
+# キャプチャ → OCR を && で連結して一気に実行（推奨）
+uv run kindle-cap --name my-book --pages 200 --auto-direction \
+  && uv run book-ocr output/my-book/
 ```
+
+> [!TIP]
+> `book-ocr` は 200 ページ本で約 1 時間かかる（後述の性能の目安を参照）。撮影と OCR を別々に打つと OCR の打ち忘れや待ち時間の分断が起きやすいので、上記のように **`&&` で連結して 1 回の実行にまとめ、放置しておく**のがおすすめ。連結は `;` ではなく `&&` にすること — `;` だとキャプチャが途中で失敗しても OCR が走ってしまい、不完全な PNG 群を延々処理してしまう。
 
 実行後の出力:
 
@@ -192,6 +195,10 @@ uv run kindle-cap --name my-book --pages 800 --direction ltr --auto-stop --wait 
 
 # 位置確認だけ（撮影しない）
 uv run kindle-cap --pages 1 --direction rtl --dry-run
+
+# 撮影から AI 用 markdown 生成まで一気通貫（&& 連結で放置運用）
+uv run kindle-cap --name my-book --pages 1000 --auto-direction --pdf-jpeg-quality 80 --auto-stop \
+  && uv run book-ocr output/my-book/
 ```
 
 ## 仕組み
