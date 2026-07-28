@@ -10,6 +10,7 @@ import markdown as md_lib
 # <img ...src="figures/..."> / <img ...src="../figures/..."> を XHTML 自己終了タグに正規化（属性順序に依存しない）
 _FIGURE_IMG_RE = re.compile(r'<img\b([^>]*?)src="(?:\.\./)?figures/([^"]+)"([^>]*?)/?>')
 _HEADING_RE = re.compile(r"^(#{1,3})\s+(.+?)\s*$", re.MULTILINE)
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
 @dataclass(frozen=True)
@@ -44,5 +45,15 @@ def normalize_figure_srcs(html: str) -> str:
 
 
 def extract_headings(markdown_text: str) -> list[Heading]:
-    """`#`〜`###` の見出しを出現順に返す（目次生成用）。"""
-    return [Heading(len(m.group(1)), m.group(2)) for m in _HEADING_RE.finditer(markdown_text)]
+    """`#`〜`###` の見出しを出現順に返す（目次生成用）。
+
+    yomitoku の md 見出しは行内改行を `<br>` として含むことがあるため、
+    HTML タグは除去する（本文側の `<br>` は改行として有効なため対象外）。
+    タグ除去後に空文字列になった見出しは結果から除外する。
+    """
+    headings = []
+    for m in _HEADING_RE.finditer(markdown_text):
+        text = _HTML_TAG_RE.sub("", m.group(2))
+        if text:
+            headings.append(Heading(len(m.group(1)), text))
+    return headings

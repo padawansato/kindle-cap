@@ -55,3 +55,16 @@ class TestExtractHeadings:
 
     def test_no_headings(self) -> None:
         assert extract_headings("本文のみ") == []
+
+    def test_br_tag_removed_from_heading_text(self) -> None:
+        # yomitoku の md 見出しは行内改行が <br> として埋め込まれることがある
+        md = "# ちょっとしたことでうまくいく<br>発達障害の人が\n"
+        assert extract_headings(md) == [Heading(1, "ちょっとしたことでうまくいく発達障害の人が")]
+
+    def test_multiple_br_tags_removed(self) -> None:
+        md = "# は<br>じ<br>め<br>に\n"
+        assert extract_headings(md) == [Heading(1, "はじめに")]
+
+    def test_heading_that_becomes_empty_after_tag_removal_is_excluded(self) -> None:
+        md = "# <br>\n本文\n## 節\n"
+        assert extract_headings(md) == [Heading(2, "節")]
