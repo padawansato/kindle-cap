@@ -22,7 +22,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +46,10 @@ class YomiTokuEngine:
     chunk_size: int | None = None
     # chunked 実行時に tqdm で chunk 進捗を stderr に表示する (issue #38)
     progress: bool = True
+    # issue #TBD(EPUB): 図表切り出し (--figure --figure_letter)。デフォルト有効
+    figure: bool = True
+    # 収集した図画像の最終保存先 (<book_dir>/figures)。None なら収集しない
+    figure_out_dir: Path | None = None
 
     def __post_init__(self) -> None:
         if self.chunk_size is not None and self.chunk_size < 1:
@@ -74,6 +78,7 @@ class YomiTokuEngine:
             "ignore_meta": self.ignore_meta,
             "chunk_size": self.chunk_size,
             "timeout_sec": self.timeout_sec,
+            "figure": self.figure,
         }
 
     def run_batch(self, pngs: list[Path]) -> list[PageText]:
@@ -99,20 +104,15 @@ class YomiTokuEngine:
             for png in pngs:
                 (input_dir / png.name).symlink_to(png.resolve())
 
-            cmd = [
-                str(binary),
-                str(input_dir),
-                "-f",
-                "md",
-                "-o",
-                str(output_dir),
-                "-d",
+            cmd = _build_cmd(
+                binary,
+                input_dir,
+                output_dir,
                 self.device,
-                "--reading_order",
                 self.reading_order,
-            ]
-            if self.ignore_meta:
-                cmd.append("--ignore_meta")
+                self.ignore_meta,
+                self.figure,
+            )
 
             try:
                 result = subprocess.run(
@@ -130,7 +130,19 @@ class YomiTokuEngine:
 
             _ensure_yomitoku_succeeded(result.returncode, result.stdout, result.stderr)
 
-            return _collect_pages(pngs, output_dir, engine_name=self.name)
+            pages = _collect_pages(pngs, output_dir, engine_name=self.name)
+            if self.figure and self.figure_out_dir is not None:
+                tmp_figures = output_dir / "figures"
+                pages = [
+                    replace(
+                        p,
+                        markdown=_collect_figures(
+                            p.page_number, p.markdown, tmp_figures, self.figure_out_dir
+                        ),
+                    )
+                    for p in pages
+                ]
+            return pages
 
     def _resolve_binary(self) -> Path:
         if self.yomitoku_bin is not None:
@@ -168,6 +180,63 @@ def _maybe_tqdm(chunks: list[list[Path]], *, enabled: bool) -> Iterable[list[Pat
         disable=not sys.stderr.isatty(),
     )
     return wrapped
+
+
+def _build_cmd(
+    binary: Path,
+    input_dir: Path,
+    output_dir: Path,
+    device: str,
+    reading_order: str,
+    ignore_meta: bool,
+    figure: bool,
+) -> list[str]:
+    """yomitoku CLI の引数リストを組み立てる純粋関数。"""
+    cmd = [
+        str(binary),
+        str(input_dir),
+        "-f",
+        "md",
+        "-o",
+        str(output_dir),
+        "-d",
+        device,
+        "--reading_order",
+        reading_order,
+    ]
+    if ignore_meta:
+        cmd.append("--ignore_meta")
+    if figure:
+        cmd.extend(["--figure", "--figure_letter"])
+    return cmd
+
+
+def _collect_figures(
+    page_number: int,
+    markdown: str,
+    tmp_figures_dir: Path,
+    dest_dir: Path,
+) -> str:
+    """yomitoku が tmp に書いた図画像を `page_NNN_figure_i.png` 名で dest_dir にコピーし、
+    md 内の参照を書き換えて返す。
+
+    参照先ファイルが tmp に無い場合はコピーせず参照も元のまま残す
+    （book-epub 側が参照切れとして警告・スキップする）。
+    """
+    refs = extract_figure_refs(markdown)
+    if not refs:
+        return markdown
+
+    rename: dict[str, str] = {}
+    for i, old_name in enumerate(refs):
+        src = tmp_figures_dir / old_name
+        if not src.exists():
+            continue
+        new_name = f"page_{page_number:03d}_figure_{i}.png"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy(src, dest_dir / new_name)
+        rename[old_name] = new_name
+    return rewrite_figure_refs(markdown, rename)
 
 
 def _ensure_yomitoku_succeeded(returncode: int, stdout: str, stderr: str) -> None:

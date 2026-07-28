@@ -10,6 +10,8 @@ import pytest
 
 from book_ocr.engines.yomitoku import (
     YomiTokuEngine,
+    _build_cmd,
+    _collect_figures,
     _ensure_yomitoku_succeeded,
     extract_figure_refs,
     rewrite_figure_refs,
@@ -126,3 +128,78 @@ class TestFigureRefs:
     def test_rewrite_figure_refs_keeps_unknown_refs_untouched(self) -> None:
         md = '<img src="figures/unknown.png" width="200px"><br>'
         assert rewrite_figure_refs(md, {}) == md
+
+
+# ---------------------------------------------------------------------------
+# _build_cmd (純粋関数)
+# ---------------------------------------------------------------------------
+
+
+class TestBuildCmd:
+    def test_includes_figure_flags_when_enabled(self) -> None:
+        cmd = _build_cmd(
+            binary=Path("/bin/yomitoku"),
+            input_dir=Path("/tmp/in"),
+            output_dir=Path("/tmp/out"),
+            device="mps",
+            reading_order="auto",
+            ignore_meta=True,
+            figure=True,
+        )
+        assert "--figure" in cmd
+        assert "--figure_letter" in cmd
+        assert "--ignore_meta" in cmd
+
+    def test_omits_figure_flags_when_disabled(self) -> None:
+        cmd = _build_cmd(
+            binary=Path("/bin/yomitoku"),
+            input_dir=Path("/tmp/in"),
+            output_dir=Path("/tmp/out"),
+            device="mps",
+            reading_order="auto",
+            ignore_meta=False,
+            figure=False,
+        )
+        assert "--figure" not in cmd
+        assert "--figure_letter" not in cmd
+
+
+# ---------------------------------------------------------------------------
+# _collect_figures (純粋関数)
+# ---------------------------------------------------------------------------
+
+
+class TestCollectFigures:
+    def test_copies_renamed_figures_and_rewrites_md(self, tmp_path: Path) -> None:
+        tmp_figs = tmp_path / "figures"
+        tmp_figs.mkdir()
+        (tmp_figs / "input_page_003_p1_figure_0.png").write_bytes(b"png0")
+        dest = tmp_path / "dest"
+        md = '<img src="figures/input_page_003_p1_figure_0.png" width="200px"><br>'
+        result = _collect_figures(3, md, tmp_figs, dest)
+        assert (dest / "page_003_figure_0.png").read_bytes() == b"png0"
+        assert '<img src="figures/page_003_figure_0.png" alt="図">' in result
+
+    def test_returns_md_unchanged_when_no_refs(self, tmp_path: Path) -> None:
+        md = "本文のみ"
+        assert _collect_figures(1, md, tmp_path / "none", tmp_path / "dest") == md
+        assert not (tmp_path / "dest").exists()
+
+    def test_missing_figure_file_is_skipped_with_ref_kept(self, tmp_path: Path) -> None:
+        tmp_figs = tmp_path / "figures"
+        tmp_figs.mkdir()
+        dest = tmp_path / "dest"
+        md = '<img src="figures/input_page_001_p1_figure_0.png" width="200px"><br>'
+        result = _collect_figures(1, md, tmp_figs, dest)
+        assert result == md  # rename されず元参照のまま
+
+
+# ---------------------------------------------------------------------------
+# YomiTokuEngine.settings に figure を含む
+# ---------------------------------------------------------------------------
+
+
+class TestEngineSettings:
+    def test_settings_includes_figure(self) -> None:
+        assert YomiTokuEngine(figure=False).settings["figure"] is False
+        assert YomiTokuEngine().settings["figure"] is True
