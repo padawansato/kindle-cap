@@ -32,7 +32,7 @@ class TestNormalizeFigureSrcs:
         html = '<img alt="図" src="../figures/page_003_figure_0.png" />'
         result = normalize_figure_srcs(html)
         assert 'src="figures/page_003_figure_0.png"' in result
-        assert '../' not in result
+        assert "../" not in result
         assert 'alt="図"' in result
 
     def test_markdown_generated_img_with_alt_before_src(self) -> None:
@@ -41,7 +41,7 @@ class TestNormalizeFigureSrcs:
         html = md_to_xhtml_body(md)
         normalized = normalize_figure_srcs(html)
         assert 'src="figures/page_003_figure_0.png"' in normalized
-        assert '../' not in normalized
+        assert "../" not in normalized
 
 
 class TestExtractHeadings:

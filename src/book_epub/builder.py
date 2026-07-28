@@ -41,8 +41,7 @@ def build_epub(source: BookSource, author: str | None = None) -> tuple[epub.Epub
         html = normalize_figure_srcs(md_to_xhtml_body(page.markdown))
         html = _drop_missing_figures(html, available, warnings)
         marker = (
-            f'<span epub:type="pagebreak" role="doc-pagebreak" '
-            f'id="page_{page.page_number:03d}"/>'
+            f'<span epub:type="pagebreak" role="doc-pagebreak" id="page_{page.page_number:03d}"/>'
         )
         chapter = epub.EpubHtml(title=f"p.{page.page_number}", file_name=file_name, lang="ja")
         chapter.set_content(marker + html)

@@ -20,9 +20,7 @@ def _make_book_dir(tmp_path: Path, *, with_index: bool = True, with_figures: boo
         encoding="utf-8",
     )
     if with_index:
-        (book_dir / "index.json").write_text(
-            json.dumps({"title": "実タイトル"}), encoding="utf-8"
-        )
+        (book_dir / "index.json").write_text(json.dumps({"title": "実タイトル"}), encoding="utf-8")
     if with_figures:
         figs = book_dir / "figures"
         figs.mkdir()
