@@ -27,6 +27,22 @@ class TestNormalizeFigureSrcs:
         html = '<img src="figures/page_001_figure_0.png" alt="図">'
         assert normalize_figure_srcs(html) == '<img src="figures/page_001_figure_0.png" alt="図"/>'
 
+    def test_alt_before_src_attribute_order_normalized(self) -> None:
+        # Markdown-Python が生成する <img alt="..." src="..."> にも対応（属性順序に依存しない）
+        html = '<img alt="図" src="../figures/page_003_figure_0.png" />'
+        result = normalize_figure_srcs(html)
+        assert 'src="figures/page_003_figure_0.png"' in result
+        assert '../' not in result
+        assert 'alt="図"' in result
+
+    def test_markdown_generated_img_with_alt_before_src(self) -> None:
+        # md_to_xhtml_body 結果（![図](../figures/...)）を normalize_figure_srcs で処理
+        md = "![図](../figures/page_003_figure_0.png)"
+        html = md_to_xhtml_body(md)
+        normalized = normalize_figure_srcs(html)
+        assert 'src="figures/page_003_figure_0.png"' in normalized
+        assert '../' not in normalized
+
 
 class TestExtractHeadings:
     def test_levels_1_to_3_extracted_in_order(self) -> None:

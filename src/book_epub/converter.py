@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 import markdown as md_lib
 
-# <img src="figures/..."> / <img src="../figures/..."> を XHTML 自己終了タグに正規化
-_FIGURE_IMG_RE = re.compile(r'<img src="(?:\.\./)?figures/([^"]+)"([^>]*?)/?>')
+# <img ...src="figures/..."> / <img ...src="../figures/..."> を XHTML 自己終了タグに正規化（属性順序に依存しない）
+_FIGURE_IMG_RE = re.compile(r'<img\b([^>]*?)src="(?:\.\./)?figures/([^"]+)"([^>]*?)/?>')
 _HEADING_RE = re.compile(r"^(#{1,3})\s+(.+?)\s*$", re.MULTILINE)
 
 
@@ -27,8 +27,18 @@ def normalize_figure_srcs(html: str) -> str:
     """図参照を EPUB 内パス (figures/...) に正規化し、XHTML 自己終了タグにする。"""
 
     def _sub(m: re.Match[str]) -> str:
-        attrs = m.group(2).rstrip()
-        return f'<img src="figures/{m.group(1)}"{attrs}/>'
+        before_attrs = m.group(1).strip()
+        filename = m.group(2)
+        after_attrs = m.group(3).strip()
+        # src の前後の属性を保持して再構築
+        parts = ["<img"]
+        if before_attrs:
+            parts.append(f" {before_attrs}")
+        parts.append(f' src="figures/{filename}"')
+        if after_attrs:
+            parts.append(f" {after_attrs}")
+        parts.append("/>")
+        return "".join(parts)
 
     return _FIGURE_IMG_RE.sub(_sub, html)
 
