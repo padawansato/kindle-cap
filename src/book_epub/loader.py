@@ -92,5 +92,8 @@ def _read_title(book_dir: Path, warnings: list[str]) -> str | None:
     except json.JSONDecodeError:
         warnings.append(f"{index_path} を JSON として読めません。ディレクトリ名を使います")
         return None
+    if not isinstance(data, dict):
+        warnings.append(f"{index_path} の形式が不正です。ディレクトリ名を使います")
+        return None
     title = data.get("title")
     return title if isinstance(title, str) and title else None

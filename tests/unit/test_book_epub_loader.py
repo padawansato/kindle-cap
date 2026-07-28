@@ -63,3 +63,10 @@ class TestLoadBook:
         source, _ = load_book(_make_book_dir(tmp_path))
         assert source.cover_png is not None
         assert source.cover_png.name == "page_001.png"
+
+    def test_index_json_malformed_not_dict_warns(self, tmp_path: Path) -> None:
+        book_dir = _make_book_dir(tmp_path)
+        (book_dir / "index.json").write_text("null", encoding="utf-8")
+        source, warnings = load_book(book_dir)
+        assert source.title == "my-book"
+        assert any("形式が不正" in w for w in warnings)
