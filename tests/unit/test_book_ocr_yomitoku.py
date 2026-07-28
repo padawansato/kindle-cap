@@ -11,6 +11,8 @@ import pytest
 from book_ocr.engines.yomitoku import (
     YomiTokuEngine,
     _ensure_yomitoku_succeeded,
+    extract_figure_refs,
+    rewrite_figure_refs,
 )
 
 # ---------------------------------------------------------------------------
@@ -91,3 +93,36 @@ class TestRunBatchTimeoutHandling:
             pytest.raises(RuntimeError, match="timeout"),
         ):
             engine.run_batch([png])
+
+
+# ---------------------------------------------------------------------------
+# 図参照の抽出・書き換え (純粋関数)
+# ---------------------------------------------------------------------------
+
+
+class TestFigureRefs:
+    def test_extract_figure_refs_returns_filenames_in_order(self) -> None:
+        md = (
+            '本文1\n\n<img src="figures/input_page_003_p1_figure_0.png" width="200px"><br>\n'
+            '本文2\n\n<img src="figures/input_page_003_p1_figure_1.png" width="200px"><br>\n'
+        )
+        assert extract_figure_refs(md) == [
+            "input_page_003_p1_figure_0.png",
+            "input_page_003_p1_figure_1.png",
+        ]
+
+    def test_extract_figure_refs_empty_when_no_figures(self) -> None:
+        assert extract_figure_refs("# 見出しのみ\n本文") == []
+
+    def test_rewrite_figure_refs_renames_and_adds_alt(self) -> None:
+        md = '前\n<img src="figures/input_page_003_p1_figure_0.png" width="200px"><br>\n後'
+        rename = {"input_page_003_p1_figure_0.png": "page_003_figure_0.png"}
+        result = rewrite_figure_refs(md, rename)
+        assert '<img src="figures/page_003_figure_0.png" alt="図">' in result
+        assert "width=" not in result
+        assert "<br>" not in result
+        assert "前" in result and "後" in result
+
+    def test_rewrite_figure_refs_keeps_unknown_refs_untouched(self) -> None:
+        md = '<img src="figures/unknown.png" width="200px"><br>'
+        assert rewrite_figure_refs(md, {}) == md

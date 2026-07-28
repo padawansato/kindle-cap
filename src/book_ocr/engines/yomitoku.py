@@ -16,6 +16,7 @@ stderr に表示する (issue #38)。
 from __future__ import annotations
 
 import importlib.metadata
+import re
 import shutil
 import subprocess
 import sys
@@ -219,3 +220,27 @@ def _collect_pages(
         )
 
     return [by_number[n] for n in sorted(by_number.keys())]
+
+
+# yomitoku md 出力の図参照: <img src="figures/<name>" width="NNNpx"><br>
+_FIGURE_IMG_RE = re.compile(r'<img src="figures/([^"]+)"[^>]*>(?:<br>)?')
+
+
+def extract_figure_refs(markdown: str) -> list[str]:
+    """md 内の図参照ファイル名（figures/ 配下の basename）を出現順に返す。"""
+    return _FIGURE_IMG_RE.findall(markdown)
+
+
+def rewrite_figure_refs(markdown: str, rename: dict[str, str]) -> str:
+    """図参照を最終ファイル名に書き換え、alt="図" を付与し width / <br> を除去する。
+
+    `rename` に無い参照は元のまま残す（呼び出し側が警告を出す想定）。
+    """
+
+    def _sub(m: re.Match[str]) -> str:
+        old = m.group(1)
+        if old not in rename:
+            return m.group(0)
+        return f'<img src="figures/{rename[old]}" alt="図">'
+
+    return _FIGURE_IMG_RE.sub(_sub, markdown)
