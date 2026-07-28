@@ -23,6 +23,8 @@ dependencies = [
     "img2pdf>=0.5",
     "pillow>=10.0",
     "tqdm>=4.0",
+    "ebooklib>=0.18",
+    "markdown>=3.6",
 ]
 
 [project.optional-dependencies]
@@ -38,6 +40,7 @@ Issues = "https://github.com/padawansato/kindle-cap/issues"
 kindle-cap = "kindle_cap.cli:run_capture"
 kindle-cap-pdf = "kindle_cap.cli:run_rebuild_pdf"
 book-ocr = "book_ocr.cli:run_ocr"
+book-epub = "book_epub.cli:run_build"
 
 [dependency-groups]
 dev = [
@@ -82,6 +85,7 @@ quote-style = "double"
 [tool.ruff.lint.per-file-ignores]
 "src/kindle_cap/cli.py" = ["B008"]  # typer.Option / typer.Argument の標準パターン
 "src/book_ocr/cli.py" = ["B008"]  # typer.Option / typer.Argument の標準パターン
+"src/book_epub/cli.py" = ["B008"]  # typer.Option / typer.Argument の標準パターン
 "tests/**/*.py" = ["B017"]  # frozen dataclass の不変性検証で bare Exception を使う
 
 [tool.mypy]
@@ -100,9 +104,13 @@ ignore_missing_imports = true
 module = ["tqdm", "tqdm.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["ebooklib", "ebooklib.*", "markdown", "markdown.*"]
+ignore_missing_imports = true
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/kindle_cap", "src/book_ocr"]
+packages = ["src/kindle_cap", "src/book_ocr", "src/book_epub"]
