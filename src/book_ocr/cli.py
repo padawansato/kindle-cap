@@ -37,6 +37,7 @@ def run_ocr_pipeline(
     progress: bool = True,
     skip_existing: bool = False,
     ignore_disk_check: bool = False,
+    figure: bool = True,
 ) -> Path:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を出力する.
 
@@ -74,6 +75,8 @@ def run_ocr_pipeline(
         chunk_size=chunk_size,
         timeout_sec=timeout_sec,
         progress=progress,
+        figure=figure,
+        figure_out_dir=(out_dir / "figures") if figure else None,
     )
     captured_at = datetime.now(UTC)
 
@@ -203,6 +206,14 @@ def ocr(
             "デフォルトでは入力 PNG × 1.5 のマージンで out_dir / tempdir の残量を確認する。"
         ),
     ),
+    figure: bool = typer.Option(
+        True,
+        "--figure/--no-figure",
+        help=(
+            "図表領域を切り出して figures/ に保存し、md に参照を埋め込む (EPUB 用)。"
+            "図中テキストも --figure_letter で本文に含める。"
+        ),
+    ),
 ) -> None:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を生成する."""
     try:
@@ -220,6 +231,7 @@ def ocr(
             progress=progress,
             skip_existing=skip_existing,
             ignore_disk_check=ignore_disk_check,
+            figure=figure,
         )
     except FileNotFoundError as e:
         typer.echo(str(e), err=True)
@@ -256,6 +268,7 @@ def _partition_existing_pages(
             continue
         content = md_path.read_text(encoding="utf-8")
         body = _PAGE_MARKER_RE.sub("", content, count=1)
+        body = body.replace('src="../figures/', 'src="figures/')
         existing.append(
             PageText(
                 page_number=n,

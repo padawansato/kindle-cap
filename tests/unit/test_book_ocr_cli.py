@@ -12,7 +12,7 @@ import typer
 from typer.testing import CliRunner
 
 from book_ocr import cli
-from book_ocr.cli import run_ocr_pipeline
+from book_ocr.cli import _partition_existing_pages, run_ocr_pipeline
 from book_ocr.models import PageText
 
 
@@ -454,6 +454,21 @@ class TestProgressOption:
         result = runner.invoke(app, [str(empty), "--no-progress"])
         assert result.exit_code != 0  # No page_*.png でエラー終了
         assert "No page_*.png" in result.stdout or "No page_*.png" in (result.stderr or "")
+
+
+class TestPartitionExistingFigureRefs:
+    def test_existing_page_md_figure_refs_restored_to_canonical(self, tmp_path: Path) -> None:
+        pages_dir = tmp_path / "pages"
+        pages_dir.mkdir()
+        (pages_dir / "page_001.md").write_text(
+            '<!-- page:001 -->\n\n<img src="../figures/page_001_figure_0.png" alt="図">',
+            encoding="utf-8",
+        )
+        png = tmp_path / "page_001.png"
+        png.write_bytes(b"x")
+        existing, to_ocr = _partition_existing_pages([png], pages_dir, "yomitoku")
+        assert to_ocr == []
+        assert existing[0].markdown == '<img src="figures/page_001_figure_0.png" alt="図">'
 
 
 class TestIndexMetadataExtension:
