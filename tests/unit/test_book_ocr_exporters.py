@@ -130,6 +130,24 @@ class TestRenderIndex:
         assert result["pages"][0]["png"] == "page_001.png"
 
 
+class TestRenderPageMdFigures:
+    def test_figure_src_rewritten_relative_to_pages_dir(self) -> None:
+        page = PageText(
+            page_number=3,
+            png_path=Path("page_003.png"),
+            markdown='<img src="figures/page_003_figure_0.png" alt="図">',
+            ocr_engine="yomitoku",
+        )
+        md = render_page_md(page)
+        assert '<img src="../figures/page_003_figure_0.png" alt="図">' in md
+
+    def test_no_rewrite_without_figures(self) -> None:
+        page = PageText(
+            page_number=1, png_path=Path("page_001.png"), markdown="本文", ocr_engine="yomitoku"
+        )
+        assert "figures" not in render_page_md(page)
+
+
 class TestRenderIndexOptionalMetadata:
     """issue #40: optional な reproducibility メタを additive に出力する."""
 

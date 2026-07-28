@@ -173,6 +173,7 @@ output/my-book.pdf                # 既存。視覚確認用
 | `--progress / --no-progress` | `--progress` | chunked 実行時に tqdm で chunk 進捗を stderr に表示 (issue #38) |
 | `--skip-existing` | off | 既存 `pages/page_NNN.md` があるページは OCR をスキップ (issue #41)。失敗後の再走を高速化 |
 | `--ignore-disk-check` | off | 起動時のディスク容量 preflight をバイパス (issue #48)。デフォルトは入力 PNG × 1.5 マージンで out_dir / tempdir 残量を確認し、不足なら exit 1 |
+| `--figure / --no-figure` | `--figure` | ページ内の図表を画像として `figures/` に切り出し、`pages/page_NNN.md` に `<img>` 参照として埋め込む |
 
 #### 性能の目安（Apple Silicon MPS）
 
@@ -183,6 +184,31 @@ output/my-book.pdf                # 既存。視覚確認用
 - yomitoku の `subprocess.run(timeout=1800s)` で各 chunk が中断されるため、`--chunk-size 50` だと 1 chunk あたり ~16 分で安全マージン内
 
 詳細な PoC レポートは [`docs/ocr-bench/2026-04-28.md`](docs/ocr-bench/2026-04-28.md) を参照。
+
+### book-epub — 読み上げ可能な図表入り EPUB を生成（オプション）
+
+`book-ocr` の成果物（`pages/*.md` + `figures/`）から、リフロー型 EPUB 3 を生成する。
+Send to Kindle で取り込めば、Kindle アプリの読み上げ機能（Assistive Reader）で聴ける。
+
+```bash
+# OCR (図表切り出しはデフォルト有効) → EPUB 組立
+uv run book-ocr output/my-book/ && uv run book-epub output/my-book/
+
+# EPUB だけ作り直し（再 OCR 不要）
+uv run book-epub output/my-book/ --title "正式な書名" --author "著者名"
+```
+
+| オプション | デフォルト | 説明 |
+|---|---|---|
+| `--title TEXT` | index.json の title → ディレクトリ名 | 書名 |
+| `--author TEXT` | なし | 著者名 (EPUB メタデータ) |
+| `--out PATH` | `<book_dir>/<title>.epub` | 出力先 |
+
+- 図表は本文の流れの中に埋め込まれ、`--figure_letter` で抽出した図中テキストは
+  読み上げ対象の本文として図の近くに配置される
+- `figures/` が無い書籍（v0.3.x 以前に OCR したもの）は警告つきでテキストのみの
+  EPUB になる。図表入りにするには `book-ocr` を再実行する
+- 縦書き表示は未対応（読み上げ用途では横書きで実用上問題なし）
 
 ### よくある使い方
 

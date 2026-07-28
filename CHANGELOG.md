@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- `book-epub`: 新コマンド。`book-ocr` の成果物（`pages/*.md` + `figures/`）から読み上げ可能な図表入り EPUB 3 を生成する
+
+### Changed
+
+- `book-ocr`: 図表切り出し（`--figure/--no-figure`、デフォルト有効）。図画像を `figures/` に保存し md に参照埋め込み（既存デフォルト挙動の変更）
+
 ## [0.3.0] - 2026-05-22
 
 ### Added
