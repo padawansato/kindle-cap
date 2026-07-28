@@ -29,6 +29,10 @@ def run_build_pipeline(
     return epub_path
 
 
+app = typer.Typer()
+
+
+@app.command()
 def build(
     book_dir: Path = typer.Argument(
         ...,
@@ -55,4 +59,4 @@ def build(
 
 
 def run_build() -> None:
-    typer.run(build)
+    app()

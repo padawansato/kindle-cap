@@ -6,8 +6,11 @@ import json
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
-from book_epub.cli import run_build_pipeline
+from book_epub.cli import app, run_build_pipeline
+
+runner = CliRunner()
 
 
 def _make_book_dir(tmp_path: Path) -> Path:
@@ -38,3 +41,18 @@ class TestRunBuildPipeline:
         empty.mkdir()
         with pytest.raises(FileNotFoundError):
             run_build_pipeline(empty, title=None, author=None, out=None)
+
+
+class TestCliInvocation:
+    def test_missing_pages_returns_exit_code_1(self, tmp_path: Path) -> None:
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        result = runner.invoke(app, [str(empty)])
+        assert result.exit_code == 1
+        assert "book-ocr" in result.stdout or "book-ocr" in result.stderr
+
+    def test_valid_book_dir_returns_exit_code_0(self, tmp_path: Path) -> None:
+        book_dir = _make_book_dir(tmp_path)
+        result = runner.invoke(app, [str(book_dir)])
+        assert result.exit_code == 0
+        assert "EPUB complete:" in result.stdout

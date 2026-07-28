@@ -51,3 +51,10 @@ class TestEndToEnd:
         page2 = book.get_item_with_href("page_002.xhtml").get_content().decode("utf-8")
         assert 'alt="図"' in page2
         assert "グラフの説明ラベル" in page2  # 図中テキストが読み上げ対象の本文にある
+
+        # spine 順序検証（読み上げ順序）
+        spine_idrefs = [idref for idref, _ in book.spine]
+        assert "nav" in spine_idrefs
+        chapter_idrefs = [ref for ref in spine_idrefs if ref.startswith("chapter_")]
+        assert len(chapter_idrefs) == 3
+        assert chapter_idrefs == ["chapter_0", "chapter_1", "chapter_2"]
