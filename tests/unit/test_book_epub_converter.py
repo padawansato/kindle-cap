@@ -16,6 +16,27 @@ class TestMdToXhtmlBody:
         md = "<table><tr><td>セル</td></tr></table>"
         assert "<table>" in md_to_xhtml_body(md)
 
+    def test_br_between_japanese_text_is_removed_without_space(self) -> None:
+        # yomitoku は原本の行折り返し位置を <br> として本文に埋め込む（レイアウト由来の強制改行）
+        html = md_to_xhtml_body("考えから抜け<br>出せなくなる")
+        assert "<p>考えから抜け出せなくなる</p>" in html
+        assert "<br" not in html
+
+    def test_br_between_ascii_words_becomes_space(self) -> None:
+        html = md_to_xhtml_body("Robotics<br>by")
+        assert "<p>Robotics by</p>" in html
+        assert "<br" not in html
+
+    def test_self_closing_br_variants_removed(self) -> None:
+        for tag in ("<br/>", "<br />"):
+            html = md_to_xhtml_body(f"抜け{tag}出せなく")
+            assert "抜け出せなく" in html
+            assert "<br" not in html
+
+    def test_text_without_br_is_unchanged(self) -> None:
+        html = md_to_xhtml_body("本文です。")
+        assert "<p>本文です。</p>" in html
+
 
 class TestNormalizeFigureSrcs:
     def test_parent_relative_src_normalized(self) -> None:
