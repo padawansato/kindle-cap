@@ -48,13 +48,20 @@ def load_book(book_dir: Path, title_override: str | None = None) -> tuple[BookSo
             f"{pages_dir} に page_*.md がありません。先に book-ocr を実行してください。"
         )
 
-    pages = [
-        SourcePage(
-            page_number=int(p.stem.split("_")[-1]),
-            markdown=_PAGE_MARKER_RE.sub("", p.read_text(encoding="utf-8"), count=1),
+    pages = []
+    for p in md_paths:
+        try:
+            page_number = int(p.stem.split("_")[-1])
+        except ValueError:
+            warnings.append(f"{p.name} はページ番号を認識できないためスキップします")
+            continue
+        pages.append(
+            SourcePage(
+                page_number=page_number,
+                markdown=_PAGE_MARKER_RE.sub("", p.read_text(encoding="utf-8"), count=1),
+            )
         )
-        for p in md_paths
-    ]
+    pages.sort(key=lambda page: page.page_number)
 
     title = title_override or _read_title(book_dir, warnings) or book_dir.name
 

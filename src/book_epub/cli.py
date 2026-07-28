@@ -11,6 +11,11 @@ from book_epub.builder import build_epub
 from book_epub.loader import load_book
 
 
+def _sanitize_filename(name: str) -> str:
+    """デフォルト出力ファイル名用にパス区切り文字を全角に置換する（--out 明示指定時は対象外）。"""
+    return name.replace("/", "／").replace("\\", "＼")
+
+
 def run_build_pipeline(
     book_dir: Path,
     title: str | None,
@@ -23,7 +28,7 @@ def run_build_pipeline(
     for w in [*warnings, *build_warnings]:
         typer.echo(f"[警告] {w}", err=True)
 
-    epub_path = out or (book_dir / f"{source.title}.epub")
+    epub_path = out or (book_dir / f"{_sanitize_filename(source.title)}.epub")
     epub_path.parent.mkdir(parents=True, exist_ok=True)
     epub.write_epub(str(epub_path), book)
     return epub_path

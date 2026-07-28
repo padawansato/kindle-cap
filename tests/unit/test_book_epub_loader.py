@@ -68,3 +68,21 @@ class TestLoadBook:
         source, warnings = load_book(book_dir)
         assert source.title == "my-book"
         assert any("形式が不正" in w for w in warnings)
+
+    def test_pages_are_sorted_numerically_beyond_1000(self, tmp_path: Path) -> None:
+        book_dir = tmp_path / "big-book"
+        pages = book_dir / "pages"
+        pages.mkdir(parents=True)
+        for n in (999, 1000, 1001, 101):
+            (pages / f"page_{n:03d}.md").write_text(
+                f"<!-- page:{n:03d} -->\n\n本文{n}", encoding="utf-8"
+            )
+        source, _ = load_book(book_dir)
+        assert [p.page_number for p in source.pages] == [101, 999, 1000, 1001]
+
+    def test_non_numeric_stem_is_skipped_with_warning(self, tmp_path: Path) -> None:
+        book_dir = _make_book_dir(tmp_path)
+        (book_dir / "pages" / "page_backup.md").write_text("バックアップ", encoding="utf-8")
+        source, warnings = load_book(book_dir)
+        assert [p.page_number for p in source.pages] == [1, 2]
+        assert any("page_backup.md" in w for w in warnings)

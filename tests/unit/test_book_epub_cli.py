@@ -42,6 +42,20 @@ class TestRunBuildPipeline:
         with pytest.raises(FileNotFoundError):
             run_build_pipeline(empty, title=None, author=None, out=None)
 
+    def test_title_with_slash_is_sanitized_in_default_out_path(self, tmp_path: Path) -> None:
+        book_dir = _make_book_dir(tmp_path)
+        out = run_build_pipeline(book_dir, title="AI/ML入門", author=None, out=None)
+        assert out.parent == book_dir
+        assert out.name == "AI／ML入門.epub"
+        assert out.exists()
+
+    def test_explicit_out_option_is_not_sanitized(self, tmp_path: Path) -> None:
+        book_dir = _make_book_dir(tmp_path)
+        dest = tmp_path / "elsewhere" / "custom.epub"
+        out = run_build_pipeline(book_dir, title="AI/ML入門", author=None, out=dest)
+        assert out == dest
+        assert out.exists()
+
 
 class TestCliInvocation:
     def test_missing_pages_returns_exit_code_1(self, tmp_path: Path) -> None:
