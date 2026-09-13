@@ -2,6 +2,19 @@
 
 このプロジェクトの変更履歴。形式は [Keep a Changelog](https://keepachangelog.com/) に準拠し、バージョニングは [Semantic Versioning](https://semver.org/) に従う。
 
+## [0.5.0] - 2026-09-13
+
+### Added
+
+- `book-ocr`: OCR の生 JSON を `pages/page_NNN.json` に保存するようになった。`index.json` の `pages[]` にも `json` キーが additive に載る。文字単位の座標 (`words[].points`) と縦横の向きを含むので、ここから透明テキストレイヤーつき PDF を作れる（issue #70 の準備）。既存 JSON があれば再 OCR なしで後段の成果物を作り直せる
+
+### Changed
+
+- `book-ocr`: yomitoku の呼び出しを `-f md` から `-f json` に変更し、markdown は保存した JSON から生成するようにした。**出力される `pages/*.md` と `figures/*.png` は従来とバイト一致**（実書籍 11 ページで md 11/11・figure 21/21 を検証済み）なので、`book-epub` を含む下流への影響はない（issue #70）
+- `book-ocr`: markdown 生成を `md_render_worker` として別プロセスに分離した。本体プロセスが yomitoku を import しなくなり、`yomitoku_bin` で隔離 venv を指す運用もそのまま保てる（issue #70）
+- `book-ocr`: ディスク容量の事前チェックに JSON 出力分（100KB/ページ）を加算するようにした。JSON はチャンクをまたいで蓄積されるため、`--chunk-size` の指定に関わらず全ページ分を見積もる（issue #70）
+- **breaking**: `ocr` extra の yomitoku 要件を `>=0.4` から `>=0.12,<1` に変更。markdown 生成が yomitoku の内部 API（`DocumentAnalyzerSchema` / `convert_markdown`）に直接依存するため。0.11 以前を使っている場合は `uv sync --extra ocr` で更新が必要（issue #70）
+
 ## [0.4.0] - 2026-07-29
 
 ### Added
