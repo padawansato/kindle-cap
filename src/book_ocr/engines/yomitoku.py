@@ -16,13 +16,14 @@ stderr に表示する (issue #38)。
 from __future__ import annotations
 
 import importlib.metadata
+import json
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from collections.abc import Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,18 @@ from book_ocr.models import PageText
 
 _BINARY_NAME = "yomitoku"
 _INPUT_DIR_NAME = "input"
+# md レンダ worker のパス。yomitoku を import する唯一のファイルで、subprocess で起動する。
+_WORKER_PATH = Path(__file__).with_name("md_render_worker.py")
+
+
+def _resolve_worker_python(yomitoku_bin: Path) -> Path:
+    """yomitoku バイナリと同じ環境の python を返す。
+
+    `yomitoku_bin` で隔離 venv を指している場合でも、その venv の python で worker を
+    起動すれば yomitoku を import できる。見つからなければ実行中の python に falls back。
+    """
+    candidate = yomitoku_bin.parent / "python"
+    return candidate if candidate.exists() else Path(sys.executable)
 
 
 @dataclass
@@ -50,6 +63,8 @@ class YomiTokuEngine:
     figure: bool = True
     # 収集した図画像の最終保存先 (<book_dir>/figures)。None なら収集しない
     figure_out_dir: Path | None = None
+    # OCR の生 JSON の保存先 (<book_dir>/pages)。None なら永続化しない (issue #70)
+    json_out_dir: Path | None = None
 
     def __post_init__(self) -> None:
         if self.chunk_size is not None and self.chunk_size < 1:
@@ -111,7 +126,6 @@ class YomiTokuEngine:
                 self.device,
                 self.reading_order,
                 self.ignore_meta,
-                self.figure,
             )
 
             try:
@@ -130,19 +144,77 @@ class YomiTokuEngine:
 
             _ensure_yomitoku_succeeded(result.returncode, result.stdout, result.stderr)
 
-            pages = _collect_pages(pngs, output_dir, engine_name=self.name)
-            if self.figure and self.figure_out_dir is not None:
-                tmp_figures = output_dir / "figures"
-                pages = [
-                    replace(
-                        p,
-                        markdown=_collect_figures(
-                            p.page_number, p.markdown, tmp_figures, self.figure_out_dir
-                        ),
-                    )
-                    for p in pages
-                ]
-            return pages
+            entries = _collect_json_entries(pngs, output_dir)
+            # tempdir は with を抜けると消えるので、JSON は engine 側でここで永続化する
+            # (writer には運ばない。PageText.json_path が dangling になるのを防ぐ)。
+            persisted = self._persist_json(entries)
+
+            # figure の出力先。figure_out_dir が無いときは tempdir 配下に書かせる
+            # (md 内の参照は残るが実体は残らない = 従来の挙動と同じ)。
+            figures_dir = (
+                self.figure_out_dir if self.figure_out_dir is not None else output_dir / "figures"
+            )
+            manifest = _build_render_manifest(
+                entries,
+                figure_parent=figures_dir.parent,
+                figure_dir_name=figures_dir.name,
+                export_figure=self.figure,
+            )
+            markdown_by_page = self._render_markdown(binary, manifest, tmp_dir)
+
+            return [
+                PageText(
+                    page_number=n,
+                    png_path=png,
+                    markdown=_finalize_figure_refs(markdown_by_page[n], figures_dir),
+                    ocr_engine=self.name,
+                    json_path=persisted.get(n),
+                )
+                for n, png, _json_path in entries
+            ]
+
+    def _persist_json(self, entries: list[tuple[int, Path, Path]]) -> dict[int, Path]:
+        """tmp の JSON を `<json_out_dir>/page_NNN.json` へ退避し、page -> 保存先を返す。"""
+        if self.json_out_dir is None:
+            return {}
+        self.json_out_dir.mkdir(parents=True, exist_ok=True)
+        saved: dict[int, Path] = {}
+        for n, _png, json_path in entries:
+            dest = self.json_out_dir / f"page_{n:03d}.json"
+            shutil.copy(json_path, dest)
+            saved[n] = dest
+        return saved
+
+    def _render_markdown(
+        self, binary: Path, manifest: dict[str, Any], tmp_dir: Path
+    ) -> dict[int, str]:
+        """md レンダ worker を subprocess で起動して markdown を得る。
+
+        本体プロセスに yomitoku を import させないための隔離
+        (`md_render_worker` の docstring 参照)。
+        """
+        manifest_path = tmp_dir / "render_manifest.json"
+        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+
+        cmd = [str(_resolve_worker_python(binary)), str(_WORKER_PATH), str(manifest_path)]
+        try:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout_sec,
+            )
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError(f"md レンダ worker timeout (exceeded {self.timeout_sec}s).") from e
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"md レンダ worker failed (exit={result.returncode}). "
+                f"yomitoku が入っていない場合は `uv sync --extra ocr` を実行してください。\n"
+                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+        return _parse_render_output(result.stdout)
 
     def _resolve_binary(self) -> Path:
         if self.yomitoku_bin is not None:
@@ -189,14 +261,23 @@ def _build_cmd(
     device: str,
     reading_order: str,
     ignore_meta: bool,
-    figure: bool,
 ) -> list[str]:
-    """yomitoku CLI の引数リストを組み立てる純粋関数。"""
+    """yomitoku CLI の引数リストを組み立てる純粋関数。
+
+    出力形式は JSON 固定 (issue #70)。markdown は `md_render_worker` が同じ JSON から
+    起こすので、OCR は 1 回で済む。
+
+    figure 系フラグは付けない:
+    - `--figure_letter` は json exporter が受け取らない (md/csv/html 専用)
+    - `--figure` は tmp に使わない図画像を書くだけ。`figures[]` は指定の有無に
+      関わらず JSON に含まれる
+    図の切り出しは worker 側の `convert_markdown(export_figure=True)` が行う。
+    """
     cmd = [
         str(binary),
         str(input_dir),
         "-f",
-        "md",
+        "json",
         "-o",
         str(output_dir),
         "-d",
@@ -206,36 +287,60 @@ def _build_cmd(
     ]
     if ignore_meta:
         cmd.append("--ignore_meta")
-    if figure:
-        cmd.extend(["--figure", "--figure_letter"])
     return cmd
 
 
-def _collect_figures(
-    page_number: int,
-    markdown: str,
-    tmp_figures_dir: Path,
-    dest_dir: Path,
-) -> str:
-    """yomitoku が tmp に書いた図画像を `page_NNN_figure_i.png` 名で dest_dir にコピーし、
-    md 内の参照を書き換えて返す。
+def _build_render_manifest(
+    entries: list[tuple[int, Path, Path]],
+    figure_parent: Path,
+    figure_dir_name: str,
+    export_figure: bool,
+) -> dict[str, Any]:
+    """md レンダ worker に渡す manifest を組み立てる純粋関数。
 
-    参照先ファイルが tmp に無い場合はコピーせず参照も元のまま残す
-    （book-epub 側が参照切れとして警告・スキップする）。
+    `out_path` は md の書き出し先ではなく、figure の保存先
+    (`<figure_parent>/<figure_dir_name>/`) と figure 名の接頭辞
+    (`page_NNN_figure_<i>.png`) を決めるためのもの。
+    """
+    return {
+        "export_figure": export_figure,
+        "figure_dir_name": figure_dir_name,
+        "pages": [
+            {
+                "n": n,
+                "png": str(png),
+                "json": str(json_path),
+                "out_path": str(figure_parent / f"page_{n:03d}.md"),
+            }
+            for n, png, json_path in entries
+        ],
+    }
+
+
+def _parse_render_output(stdout: str) -> dict[int, str]:
+    """md レンダ worker の stdout をページ番号 -> markdown の dict にする純粋関数。"""
+    try:
+        payload = json.loads(stdout)
+        pages = payload["pages"]
+        return {int(p["n"]): str(p["markdown"]) for p in pages}
+    except (ValueError, KeyError, TypeError) as e:
+        raise RuntimeError(
+            f"md レンダ worker の出力を解釈できませんでした: {e}\nstdout: {stdout[:2000]}"
+        ) from e
+
+
+def _finalize_figure_refs(markdown: str, figures_dir: Path) -> str:
+    """worker が出した figure 参照を最終形に整える。
+
+    worker は `figures/page_NNN_figure_i.png` という最終ファイル名で書くのでリネームは
+    不要だが、`width="200px"` と `<br>` の除去、`alt="図"` の付与は現行出力との一致に
+    必要 (`rewrite_figure_refs` が担当)。実ファイルが無い参照は書き換えず残す
+    (book-epub 側が参照切れとして警告・スキップする)。
     """
     refs = extract_figure_refs(markdown)
     if not refs:
         return markdown
-
-    rename: dict[str, str] = {}
-    for i, old_name in enumerate(refs):
-        src = tmp_figures_dir / old_name
-        if not src.exists():
-            continue
-        new_name = f"page_{page_number:03d}_figure_{i}.png"
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy(src, dest_dir / new_name)
-        rename[old_name] = new_name
+    rename = {name: name for name in refs if (figures_dir / name).exists()}
     return rewrite_figure_refs(markdown, rename)
 
 
@@ -250,21 +355,20 @@ def _ensure_yomitoku_succeeded(returncode: int, stdout: str, stderr: str) -> Non
         )
 
 
-def _collect_pages(
+def _collect_json_entries(
     pngs: list[Path],
     output_dir: Path,
-    engine_name: str,
-) -> list[PageText]:
-    """yomitoku が書き出した `<_INPUT_DIR_NAME>_<stem>_p1.md` ファイル群を PageText に変換する.
+) -> list[tuple[int, Path, Path]]:
+    """yomitoku が書き出した `<_INPUT_DIR_NAME>_<stem>_p1.json` を (n, png, json) に対応づける.
 
     yomitoku CLI でディレクトリを処理すると、出力ファイル名は
-    `<input_dir_name>_<file_stem>_p1.md` というプレフィクス付きで生成される
-    (例: 入力ディレクトリ "input" の page_001.png → "input_page_001_p1.md")。
-    本関数は確定した命名規則で .md を読む。
+    `<input_dir_name>_<file_stem>_p1.<format>` というプレフィクス付きで生成される
+    (例: 入力ディレクトリ "input" の page_001.png → "input_page_001_p1.json")。
+    命名規約は md 出力時と同一 (`yomitoku/cli/main.py` の out_path 組み立て)。
 
     戻り値はページ番号の昇順。
     """
-    by_number: dict[int, PageText] = {}
+    by_number: dict[int, tuple[int, Path, Path]] = {}
     for png in pngs:
         # page_001.png -> 1 (kindle-cap の出力規約に合わせる)
         try:
@@ -274,19 +378,13 @@ def _collect_pages(
                 f"Cannot derive page number from {png.name}; expected page_NNN.png"
             ) from exc
 
-        md_path = output_dir / f"{_INPUT_DIR_NAME}_{png.stem}_p1.md"
-        if not md_path.exists():
-            raise FileNotFoundError(f"Expected yomitoku output {md_path} not found")
+        json_path = output_dir / f"{_INPUT_DIR_NAME}_{png.stem}_p1.json"
+        if not json_path.exists():
+            raise FileNotFoundError(f"Expected yomitoku output {json_path} not found")
 
-        markdown = md_path.read_text(encoding="utf-8")
         if n in by_number:
             raise ValueError(f"duplicate page number {n} in input pngs")
-        by_number[n] = PageText(
-            page_number=n,
-            png_path=png,
-            markdown=markdown,
-            ocr_engine=engine_name,
-        )
+        by_number[n] = (n, png, json_path)
 
     return [by_number[n] for n in sorted(by_number.keys())]
 

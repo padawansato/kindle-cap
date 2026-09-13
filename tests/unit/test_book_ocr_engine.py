@@ -10,6 +10,7 @@ yomitoku が出力するであろう .md ファイルをシミュレートし、
 
 from __future__ import annotations
 
+import json
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -20,18 +21,51 @@ import pytest
 
 from book_ocr.engines.yomitoku import YomiTokuEngine
 
+# yomitoku の JSON 出力の最小形。`_collect_json_entries` は存在確認しかしないので
+# 中身は問わないが、スキーマの形は残しておく。
+_MINIMAL_PAGE_JSON = {"paragraphs": [], "tables": [], "words": [], "figures": []}
+
+
+def _is_worker_call(cmd: list[str]) -> bool:
+    """md レンダ worker の起動かどうか (`<python> md_render_worker.py <manifest>`)。"""
+    return len(cmd) >= 2 and cmd[1].endswith("md_render_worker.py")
+
+
+def _ocr_call_count(mock_run: MagicMock) -> int:
+    """subprocess.run のうち yomitoku CLI 呼び出しだけを数える。
+
+    1 チャンクにつき OCR と md レンダ worker の 2 プロセスが走るので、
+    チャンク分割の検証では OCR 側だけを数える必要がある。
+    """
+    return sum(1 for call in mock_run.call_args_list if not _is_worker_call(call.args[0]))
+
 
 def _fake_yomitoku_subprocess(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-    """yomitoku 出力を模倣: cmd 引数から input/output ディレクトリを取り、
-    入力 PNG ごとに `input_<stem>_p1.md` を output_dir に書き出す。"""
+    """yomitoku CLI と md レンダ worker の両方を模倣する。
+
+    - yomitoku CLI: 入力 PNG ごとに `input_<stem>_p1.json` を output_dir に書き出す
+    - md レンダ worker: manifest を読み、ページごとの markdown を stdout に JSON で返す
+    """
+    if _is_worker_call(cmd):
+        manifest = json.loads(Path(cmd[2]).read_text(encoding="utf-8"))
+        payload = {
+            "pages": [
+                {"n": p["n"], "markdown": f"OCR of {Path(p['png']).name}"}
+                for p in manifest["pages"]
+            ]
+        }
+        return subprocess.CompletedProcess(
+            args=cmd, returncode=0, stdout=json.dumps(payload, ensure_ascii=False), stderr=""
+        )
+
     input_dir = Path(cmd[1])
     out_idx = cmd.index("-o")
     output_dir = Path(cmd[out_idx + 1])
     output_dir.mkdir(parents=True, exist_ok=True)
     for png in sorted(input_dir.iterdir()):
         if png.suffix == ".png":
-            md = output_dir / f"input_{png.stem}_p1.md"
-            md.write_text(f"OCR of {png.name}", encoding="utf-8")
+            out_json = output_dir / f"input_{png.stem}_p1.json"
+            out_json.write_text(json.dumps(_MINIMAL_PAGE_JSON), encoding="utf-8")
     return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
 
 
@@ -86,7 +120,7 @@ def test_chunk_size_none_uses_single_subprocess_call(mock_run: MagicMock, tmp_pa
 
     pages = engine.run_batch(pngs)
 
-    assert mock_run.call_count == 1
+    assert _ocr_call_count(mock_run) == 1
     assert len(pages) == 5
     assert [p.page_number for p in pages] == [1, 2, 3, 4, 5]
 
@@ -101,7 +135,7 @@ def test_chunk_size_larger_than_pngs_uses_single_subprocess_call(
 
     pages = engine.run_batch(pngs)
 
-    assert mock_run.call_count == 1
+    assert _ocr_call_count(mock_run) == 1
     assert len(pages) == 3
 
 
@@ -115,7 +149,7 @@ def test_chunk_size_splits_into_multiple_subprocess_calls(
 
     pages = engine.run_batch(pngs)
 
-    assert mock_run.call_count == 3
+    assert _ocr_call_count(mock_run) == 3
     assert len(pages) == 5
     assert [p.page_number for p in pages] == [1, 2, 3, 4, 5]
 
@@ -128,7 +162,7 @@ def test_chunk_size_exact_multiple_of_pngs(mock_run: MagicMock, tmp_path: Path) 
 
     pages = engine.run_batch(pngs)
 
-    assert mock_run.call_count == 2
+    assert _ocr_call_count(mock_run) == 2
     assert [p.page_number for p in pages] == [1, 2, 3, 4, 5, 6]
 
 
@@ -140,10 +174,12 @@ def test_chunk_size_uses_separate_tempdirs_per_chunk(mock_run: MagicMock, tmp_pa
 
     engine.run_batch(pngs)
 
-    # 各 call の input_dir が異なる tempdir 配下であること
+    # 各 OCR call の input_dir が異なる tempdir 配下であること
     input_dirs: set[str] = set()
     for call in mock_run.call_args_list:
         cmd: list[str] = call.args[0]
+        if _is_worker_call(cmd):
+            continue
         input_dirs.add(cmd[1])
     assert len(input_dirs) == 2  # チャンク数と一致
 
@@ -177,13 +213,17 @@ def test_chunked_execution_propagates_first_chunk_failure(
 
 
 def _make_failure_after_n_calls(n: int) -> Callable[..., subprocess.CompletedProcess[str]]:
-    """最初の n 回は成功、(n+1) 回目で TimeoutExpired を raise する side_effect。"""
+    """最初の n 回の OCR 呼び出しは成功、(n+1) 回目で TimeoutExpired を raise する side_effect。
+
+    md レンダ worker の呼び出しは数えず常に成功させる (チャンク境界の検証が目的なので)。
+    """
     counter = {"n": 0}
 
     def side_effect(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        counter["n"] += 1
-        if counter["n"] > n:
-            raise subprocess.TimeoutExpired(cmd, timeout=1.0)
+        if not _is_worker_call(cmd):
+            counter["n"] += 1
+            if counter["n"] > n:
+                raise subprocess.TimeoutExpired(cmd, timeout=1.0)
         return _fake_yomitoku_subprocess(cmd, **kwargs)
 
     return side_effect
@@ -203,7 +243,7 @@ def test_chunked_execution_propagates_mid_chunk_failure(
 
     with pytest.raises(RuntimeError, match="timeout"):
         engine.run_batch(pngs)
-    assert mock_run.call_count == 2  # 1 success + 1 fail
+    assert _ocr_call_count(mock_run) == 2  # 1 success + 1 fail
 
 
 # ---------------------------------------------------------------------------

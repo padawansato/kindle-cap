@@ -29,7 +29,11 @@ dependencies = [
 
 [project.optional-dependencies]
 ocr = [
-    "yomitoku>=0.4",
+    # 上限を切っているのは、md レンダ worker が yomitoku の内部 API
+    # (DocumentAnalyzerSchema / convert_markdown) に直接依存するため (issue #70)。
+    # schema 復元は Extra.forbid なので、フィールド追加だけでも壊れうる。
+    # 0.12 と 0.14 の schemas / export_markdown / export_json は完全一致を確認済み。
+    "yomitoku>=0.12,<1",
 ]
 
 [project.urls]

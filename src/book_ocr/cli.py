@@ -77,6 +77,9 @@ def run_ocr_pipeline(
         progress=progress,
         figure=figure,
         figure_out_dir=(out_dir / "figures") if figure else None,
+        # OCR の生 JSON は md と並べて pages/ に置く (issue #70)。searchable PDF は
+        # ここから作るので、再 OCR なしで PDF だけ作り直せる。
+        json_out_dir=out_dir / "pages",
     )
     captured_at = datetime.now(UTC)
 

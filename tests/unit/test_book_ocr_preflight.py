@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from book_ocr.preflight import (
+    JSON_BYTES_PER_PAGE,
     PreflightError,
     check_disk_space,
     estimate_required_bytes,
@@ -33,24 +34,37 @@ def test_estimate_empty_returns_zero() -> None:
 
 def test_estimate_uses_15x_margin(tmp_path: Path) -> None:
     p = _png(tmp_path / "page_001.png", size_bytes=1000)
-    assert estimate_required_bytes([p], chunk_size=None) == 1500
+    assert estimate_required_bytes([p], chunk_size=None) == 1500 + JSON_BYTES_PER_PAGE
 
 
 def test_estimate_chunk_size_only_counts_first_chunk(tmp_path: Path) -> None:
-    """chunk_size 指定時は最初の chunk 分だけを集計対象に含める."""
+    """chunk_size 指定時、tempfile 分は最初の chunk だけを集計対象に含める."""
     pngs = [_png(tmp_path / f"p_{i}.png", size_bytes=1000) for i in range(10)]
-    assert estimate_required_bytes(pngs, chunk_size=3) == int(3 * 1000 * 1.5)
+    assert estimate_required_bytes(pngs, chunk_size=3) == int(3 * 1000 * 1.5) + (
+        10 * JSON_BYTES_PER_PAGE
+    )
+
+
+def test_estimate_counts_json_for_all_pages_regardless_of_chunk_size(tmp_path: Path) -> None:
+    """OCR の生 JSON は chunk をまたいで out_dir に貯まるので全ページ分を数える (issue #70)."""
+    pngs = [_png(tmp_path / f"p_{i}.png", size_bytes=1000) for i in range(10)]
+    chunked = estimate_required_bytes(pngs, chunk_size=1)
+    assert chunked - int(1 * 1000 * 1.5) == 10 * JSON_BYTES_PER_PAGE
 
 
 def test_estimate_chunk_size_none_counts_all(tmp_path: Path) -> None:
     pngs = [_png(tmp_path / f"p_{i}.png", size_bytes=1000) for i in range(5)]
-    assert estimate_required_bytes(pngs, chunk_size=None) == int(5 * 1000 * 1.5)
+    assert estimate_required_bytes(pngs, chunk_size=None) == int(5 * 1000 * 1.5) + (
+        5 * JSON_BYTES_PER_PAGE
+    )
 
 
 def test_estimate_chunk_size_larger_than_pages_uses_all(tmp_path: Path) -> None:
     pngs = [_png(tmp_path / f"p_{i}.png", size_bytes=1000) for i in range(3)]
     # chunk_size=10 だが、pngs[:10] は 3 要素しかない
-    assert estimate_required_bytes(pngs, chunk_size=10) == int(3 * 1000 * 1.5)
+    assert estimate_required_bytes(pngs, chunk_size=10) == int(3 * 1000 * 1.5) + (
+        3 * JSON_BYTES_PER_PAGE
+    )
 
 
 # ---------------------------------------------------------------------------

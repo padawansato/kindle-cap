@@ -29,12 +29,21 @@ def render_index(meta: BookMetadata, pages: list[PageText]) -> dict[str, Any]:
         result["ocr_settings"] = meta.ocr_settings
     if meta.ocr_runtime is not None:
         result["ocr_runtime"] = meta.ocr_runtime
-    result["pages"] = [
-        {
-            "n": p.page_number,
-            "png": p.png_path.name,
-            "md": f"pages/page_{p.page_number:03d}.md",
-        }
-        for p in pages
-    ]
+    result["pages"] = [_render_page_entry(p) for p in pages]
     return result
+
+
+def _render_page_entry(page: PageText) -> dict[str, Any]:
+    """1 ページ分のエントリ。`json` は生 JSON を持つページにだけ additive に載せる.
+
+    issue #70: `--skip-existing` で md だけから復元したページは JSON を持たないので、
+    キーの有無で「searchable PDF を作れるページか」が判別できる。
+    """
+    entry: dict[str, Any] = {
+        "n": page.page_number,
+        "png": page.png_path.name,
+        "md": f"pages/page_{page.page_number:03d}.md",
+    }
+    if page.json_path is not None:
+        entry["json"] = f"pages/page_{page.page_number:03d}.json"
+    return entry

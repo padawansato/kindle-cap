@@ -14,6 +14,9 @@ class PageText:
     png_path: Path
     markdown: str
     ocr_engine: str
+    # issue #70: OCR の生 JSON の保存先。searchable PDF はここから作る。
+    # optional で後方互換維持 (BookMetadata の issue #40 拡張と同じパターン)
+    json_path: Path | None = None
 
     def __post_init__(self) -> None:
         if self.page_number <= 0:

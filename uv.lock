@@ -473,7 +473,7 @@ requires-dist = [
     { name = "pillow", specifier = ">=10.0" },
     { name = "tqdm", specifier = ">=4.0" },
     { name = "typer", specifier = ">=0.16" },
-    { name = "yomitoku", marker = "extra == 'ocr'", specifier = ">=0.4" },
+    { name = "yomitoku", marker = "extra == 'ocr'", specifier = ">=0.12,<1" },
 ]
 provides-extras = ["ocr"]
 
