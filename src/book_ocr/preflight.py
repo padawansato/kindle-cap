@@ -23,18 +23,26 @@ class PreflightError(RuntimeError):
 # 入力サイズ × 1.5 倍をマージン込みの上限と見積もる。
 _TEMPFILE_MARGIN = 1.5
 
+# OCR の生 JSON 1 ページあたりの見積もり (issue #70)。実書籍での実測は 6〜92KB/ページ
+# だったので、上振れ側に丸めて 100KB を採る。1000 ページでも 100MB 程度。
+JSON_BYTES_PER_PAGE = 100 * 1024
+
 
 def estimate_required_bytes(pngs: list[Path], chunk_size: int | None) -> int:
-    """OCR 中に同時存在し得る一時データのサイズ見積もり (bytes).
+    """OCR 中に必要な容量の見積もり (bytes).
 
-    `chunk_size` が指定されていれば 1 chunk 分のみが同時に展開される (issue #36)。
-    省略時は全 PNG 分の容量を要求する。
+    2 つの項の和:
+
+    - tempfile 分: `chunk_size` が指定されていれば 1 chunk 分のみが同時に展開される
+      (issue #36)。省略時は全 PNG 分。
+    - 永続化される JSON 分: chunk をまたいで out_dir に貯まっていくので、
+      chunk_size に関わらず**全ページ分**を数える (issue #70)。
     """
     if not pngs:
         return 0
     target = pngs if chunk_size is None else pngs[:chunk_size]
     total = sum(p.stat().st_size for p in target)
-    return int(total * _TEMPFILE_MARGIN)
+    return int(total * _TEMPFILE_MARGIN) + len(pngs) * JSON_BYTES_PER_PAGE
 
 
 def _resolve_existing_ancestor(path: Path) -> Path:

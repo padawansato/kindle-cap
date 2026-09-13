@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -85,6 +86,30 @@ class TestRenderIndex:
         meta = make_meta()
         result = render_index(meta, [])
         assert result["captured_at"] == "2026-04-28T21:00:00+00:00"
+
+    def test_pages_entry_includes_json_when_persisted(
+        self, make_meta: Callable[..., BookMetadata]
+    ) -> None:
+        """OCR の生 JSON を持つページは `json` を additive に載せる (issue #70)。"""
+        meta = make_meta()
+        page = replace(_make_page(1), json_path=Path("/tmp/output/my-book/pages/page_001.json"))
+        result = render_index(meta, [page])
+        assert result["pages"] == [
+            {
+                "n": 1,
+                "png": "page_001.png",
+                "md": "pages/page_001.md",
+                "json": "pages/page_001.json",
+            }
+        ]
+
+    def test_pages_entry_omits_json_when_absent(
+        self, make_meta: Callable[..., BookMetadata]
+    ) -> None:
+        """JSON を持たない既存ページ (md のみで再構成) では `json` キーを出さない。"""
+        meta = make_meta()
+        result = render_index(meta, [_make_page(1)])
+        assert "json" not in result["pages"][0]
 
     def test_pages_entries_have_relative_paths(
         self, make_meta: Callable[..., BookMetadata]

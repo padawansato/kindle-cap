@@ -11,8 +11,10 @@ import pytest
 from book_ocr.engines.yomitoku import (
     YomiTokuEngine,
     _build_cmd,
-    _collect_figures,
+    _build_render_manifest,
     _ensure_yomitoku_succeeded,
+    _finalize_figure_refs,
+    _parse_render_output,
     extract_figure_refs,
     rewrite_figure_refs,
 )
@@ -136,7 +138,8 @@ class TestFigureRefs:
 
 
 class TestBuildCmd:
-    def test_includes_figure_flags_when_enabled(self) -> None:
+    def test_requests_json_format(self) -> None:
+        """OCR の正準形は JSON (issue #70)。md は別 worker が JSON から起こす。"""
         cmd = _build_cmd(
             binary=Path("/bin/yomitoku"),
             input_dir=Path("/tmp/in"),
@@ -144,13 +147,36 @@ class TestBuildCmd:
             device="mps",
             reading_order="auto",
             ignore_meta=True,
-            figure=True,
         )
-        assert "--figure" in cmd
-        assert "--figure_letter" in cmd
-        assert "--ignore_meta" in cmd
+        assert cmd[cmd.index("-f") + 1] == "json"
 
-    def test_omits_figure_flags_when_disabled(self) -> None:
+    def test_omits_figure_flags(self) -> None:
+        """json exporter は --figure_letter を受け取らず、--figure は tmp に
+        使わない画像を書くだけ。figures[] は常に JSON に含まれる。"""
+        cmd = _build_cmd(
+            binary=Path("/bin/yomitoku"),
+            input_dir=Path("/tmp/in"),
+            output_dir=Path("/tmp/out"),
+            device="mps",
+            reading_order="auto",
+            ignore_meta=True,
+        )
+        assert "--figure" not in cmd
+        assert "--figure_letter" not in cmd
+
+    def test_keeps_ignore_meta_and_reading_order(self) -> None:
+        cmd = _build_cmd(
+            binary=Path("/bin/yomitoku"),
+            input_dir=Path("/tmp/in"),
+            output_dir=Path("/tmp/out"),
+            device="mps",
+            reading_order="top2bottom",
+            ignore_meta=True,
+        )
+        assert "--ignore_meta" in cmd
+        assert cmd[cmd.index("--reading_order") + 1] == "top2bottom"
+
+    def test_omits_ignore_meta_when_disabled(self) -> None:
         cmd = _build_cmd(
             binary=Path("/bin/yomitoku"),
             input_dir=Path("/tmp/in"),
@@ -158,40 +184,83 @@ class TestBuildCmd:
             device="mps",
             reading_order="auto",
             ignore_meta=False,
-            figure=False,
         )
-        assert "--figure" not in cmd
-        assert "--figure_letter" not in cmd
+        assert "--ignore_meta" not in cmd
 
 
 # ---------------------------------------------------------------------------
-# _collect_figures (純粋関数)
+# md レンダ worker との受け渡し (純粋関数)
 # ---------------------------------------------------------------------------
 
 
-class TestCollectFigures:
-    def test_copies_renamed_figures_and_rewrites_md(self, tmp_path: Path) -> None:
-        tmp_figs = tmp_path / "figures"
-        tmp_figs.mkdir()
-        (tmp_figs / "input_page_003_p1_figure_0.png").write_bytes(b"png0")
-        dest = tmp_path / "dest"
-        md = '<img src="figures/input_page_003_p1_figure_0.png" width="200px"><br>'
-        result = _collect_figures(3, md, tmp_figs, dest)
-        assert (dest / "page_003_figure_0.png").read_bytes() == b"png0"
-        assert '<img src="figures/page_003_figure_0.png" alt="図">' in result
+class TestRenderManifest:
+    def test_manifest_carries_page_json_png_and_figure_target(self, tmp_path: Path) -> None:
+        manifest = _build_render_manifest(
+            entries=[(1, tmp_path / "page_001.png", tmp_path / "page_001.json")],
+            figure_parent=tmp_path / "book",
+            figure_dir_name="figures",
+            export_figure=True,
+        )
+        assert manifest["export_figure"] is True
+        assert manifest["figure_dir_name"] == "figures"
+        (page,) = manifest["pages"]
+        assert page["n"] == 1
+        assert page["png"] == str(tmp_path / "page_001.png")
+        assert page["json"] == str(tmp_path / "page_001.json")
+        # figure_to_md は dirname(out_path)/figure_dir に書くので、out_path の
+        # 親が figures/ の親、stem が figure 名の接頭辞になる
+        assert page["out_path"] == str(tmp_path / "book" / "page_001.md")
 
-    def test_returns_md_unchanged_when_no_refs(self, tmp_path: Path) -> None:
-        md = "本文のみ"
-        assert _collect_figures(1, md, tmp_path / "none", tmp_path / "dest") == md
-        assert not (tmp_path / "dest").exists()
+    def test_export_figure_false_is_propagated(self, tmp_path: Path) -> None:
+        manifest = _build_render_manifest(
+            entries=[(3, tmp_path / "page_003.png", tmp_path / "page_003.json")],
+            figure_parent=tmp_path,
+            figure_dir_name="figures",
+            export_figure=False,
+        )
+        assert manifest["export_figure"] is False
 
-    def test_missing_figure_file_is_skipped_with_ref_kept(self, tmp_path: Path) -> None:
-        tmp_figs = tmp_path / "figures"
-        tmp_figs.mkdir()
-        dest = tmp_path / "dest"
-        md = '<img src="figures/input_page_001_p1_figure_0.png" width="200px"><br>'
-        result = _collect_figures(1, md, tmp_figs, dest)
-        assert result == md  # rename されず元参照のまま
+
+class TestParseRenderOutput:
+    def test_maps_page_number_to_markdown(self) -> None:
+        stdout = '{"pages": [{"n": 2, "markdown": "b"}, {"n": 1, "markdown": "a"}]}'
+        assert _parse_render_output(stdout) == {1: "a", 2: "b"}
+
+    def test_raises_on_non_json_stdout(self) -> None:
+        with pytest.raises(RuntimeError, match="md レンダ worker"):
+            _parse_render_output("Traceback (most recent call last):")
+
+    def test_raises_when_pages_key_missing(self) -> None:
+        with pytest.raises(RuntimeError, match="md レンダ worker"):
+            _parse_render_output('{"unexpected": []}')
+
+
+# ---------------------------------------------------------------------------
+# figure 参照の最終形 (純粋関数)
+# ---------------------------------------------------------------------------
+
+
+class TestFinalizeFigureRefs:
+    def test_strips_width_and_br_and_adds_alt(self, tmp_path: Path) -> None:
+        """worker は最終ファイル名で figures を書くのでリネームは不要だが、
+        width / <br> の除去と alt="図" の付与は golden 一致に必要 (Fable 指摘)。"""
+        figures = tmp_path / "figures"
+        figures.mkdir()
+        (figures / "page_001_figure_0.png").write_bytes(b"x")
+        md = '<img src="figures/page_001_figure_0.png" width="200px"><br>\n本文'
+        assert (
+            _finalize_figure_refs(md, figures)
+            == '<img src="figures/page_001_figure_0.png" alt="図">\n本文'
+        )
+
+    def test_leaves_reference_untouched_when_file_missing(self, tmp_path: Path) -> None:
+        figures = tmp_path / "figures"
+        figures.mkdir()
+        md = '<img src="figures/missing.png" width="200px"><br>'
+        assert _finalize_figure_refs(md, figures) == md
+
+    def test_no_figures_is_passthrough(self, tmp_path: Path) -> None:
+        assert _finalize_figure_refs("本文のみ", tmp_path / "figures") == "本文のみ"
 
 
 # ---------------------------------------------------------------------------
