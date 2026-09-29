@@ -849,3 +849,119 @@ def test_run_keyboard_interrupt_path_does_not_trigger_failure_log(
     run(_config(tmp_path, pages=5))
     assert "capture failed" not in caplog.text
     mock_pdf.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# crop_top: 撮影矩形の上端を削って capture_rect に渡す (issue #69)
+# ---------------------------------------------------------------------------
+
+_CROPPED = Geometry(x=0, y=28, width=100, height=72)
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_crop_top_shrinks_geometry_passed_to_capture(
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_geom.return_value = _GEOM
+    run(_config(tmp_path, pages=2, crop_top=28))
+    assert [c.args[0] for c in mock_cap.call_args_list] == [_CROPPED, _CROPPED]
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_crop_top_zero_passes_geometry_unchanged(
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_geom.return_value = _GEOM
+    run(_config(tmp_path, pages=1))
+    assert mock_cap.call_args.args[0] == _GEOM
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_dry_run_applies_crop_top(
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
+    """--dry-run で位置確認する 1 枚にも crop が効いていないと確認の意味がない."""
+    mock_geom.return_value = _GEOM
+    run(_config(tmp_path, crop_top=28), dry_run=True)
+    assert mock_cap.call_args.args[0] == _CROPPED
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+@patch("kindle_cap.orchestrator.detect_direction")
+def test_run_auto_direction_geom_provider_applies_crop_top(
+    mock_detect: MagicMock,
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
+    """試写 (detect_direction) に渡す geom_provider も crop 済みでないと表紙だけ枠が残る."""
+    mock_geom.return_value = _GEOM
+    mock_detect.side_effect = _make_detect_stub(Direction.LTR, 3)
+    mock_cap.side_effect = lambda g, p: p.write_bytes(b"new")
+    run(_config(tmp_path, pages=4, direction=None, crop_top=28), auto_direction=True)
+    geom_provider = mock_detect.call_args.kwargs["geom_provider"]
+    assert geom_provider() == _CROPPED
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_crop_top_larger_than_window_raises_value_error(
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+) -> None:
+    """ウィンドウ高さ以上の crop は撮影前に ValueError で止まり、capture_rect は呼ばれない."""
+    mock_geom.return_value = _GEOM  # height=100
+    with pytest.raises(ValueError, match="crop_top"):
+        run(_config(tmp_path, pages=1, crop_top=100))
+    assert not mock_cap.called

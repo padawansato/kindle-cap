@@ -2,6 +2,16 @@
 
 このプロジェクトの変更履歴。形式は [Keep a Changelog](https://keepachangelog.com/) に準拠し、バージョニングは [Semantic Versioning](https://semver.org/) に従う。
 
+## [Unreleased]
+
+### Added
+
+- `kindle-cap --crop-top N`：撮影矩形の上端から N 論理ポイントを削る。System Events が返すウィンドウ frame はタイトルバー（信号機ボタン）を含むため、固定型書籍ではページ画像上端にボタンが写り込んでいた。既定値 0 で従来と同じ挙動。`--dry-run` / `--auto-direction` の試写にも同じ crop が適用される。`CaptureConfig.crop_top` と純粋関数 `kindle_cap.capture.crop_top(geom, points)` を追加（issue #69）
+
+### Changed
+
+- `kindle-cap`：orchestrator が投げる `ValueError`（`crop_top` がウィンドウ高さ以上など）を traceback ではなく `logger.error` + exit 1 で表示するようにした（issue #69）
+
 ## [0.5.0] - 2026-09-13
 
 ### Added

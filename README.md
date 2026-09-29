@@ -106,6 +106,7 @@ output/my-book.pdf
 | `--auto-stop` | | off | 連続する 2 ページが同一なら書籍末尾と判断して停止 |
 | `--pdf-jpeg-quality N` | | （未指定） | PDF 埋め込み画像を JPEG quality N (1-100) で再圧縮。未指定時は lossless PNG 埋め込み。**テキスト書籍は 80 程度推奨で PDF サイズが ~1/10 に** (issue #50) |
 | `--progress / --no-progress` | | `--no-progress` | `--pdf-jpeg-quality` 指定時の JPEG 変換ループ進捗を `tqdm` で stderr に表示。1000+ ページ書籍で「ハングしたのか」を判別できるようにする (issue #53) |
+| `--crop-top N` | | `0` | 撮影矩形の上端から N 論理ポイント削る。固定型書籍でウィンドウ左上の信号機ボタンが写り込む場合に指定。まず `--dry-run` で `output/dry_run.png` を見て値を決める（Retina でもポイント単位のまま） (issue #69) |
 
 ※ `--direction` または `--auto-direction` のいずれかが必須（同時指定はエラー）
 
@@ -222,6 +223,9 @@ uv run kindle-cap --name my-book --pages 800 --direction ltr --auto-stop --wait 
 # 位置確認だけ（撮影しない）
 uv run kindle-cap --pages 1 --direction rtl --dry-run
 
+# 固定型書籍で信号機ボタンが写り込む場合、上端を削る（値は --dry-run で確認）
+uv run kindle-cap --name fixed-book --pages 300 --auto-direction --crop-top 28
+
 # 撮影から AI 用 markdown 生成まで一気通貫（&& 連結で放置運用）
 uv run kindle-cap --name my-book --pages 1000 --auto-direction --pdf-jpeg-quality 80 --auto-stop \
   && uv run book-ocr output/my-book/
@@ -249,7 +253,7 @@ osascript / screencapture
 
 ## 既知の制約
 
-- **メニュー映り込み**: ウィンドウ全体を撮るため、Kindle のメニューバーが含まれる
+- **メニュー映り込み**: ウィンドウ全体を撮るため、Kindle のメニューバーやタイトルバー（信号機ボタン）が含まれる。上端だけなら `--crop-top N` で削れる（値は `--dry-run` で確認）
 - **モード崩れに注意**: 撮影中にユーザーが他アプリを最前面にすると矢印キーが他アプリに飛ぶ可能性（毎回 `activate` で緩和してるが完全ではない）
 - **マルチディスプレイ対応**: 仮想スクリーン全体の座標系で動作する設計（純粋関数レベルでテスト済）。実機検証は単一ディスプレイで実施
 - **アニメーションが重い書籍**: `--wait` を上げると安全
