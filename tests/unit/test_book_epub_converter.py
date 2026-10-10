@@ -110,3 +110,35 @@ class TestDropSingleCharParagraphs:
         # 空行で区切られていない行は段落の一部なので落とさない
         html = md_to_xhtml_body("一\n二\n三")
         assert "一" in html and "二" in html and "三" in html
+
+
+class TestReadAloudNormalization:
+    """読み上げ (Assistive Reader) の邪魔になるノンブルと柱を落とす"""
+
+    def test_page_number_paragraphs_are_dropped_but_real_content_kept(self) -> None:
+        from book_epub.converter import md_to_xhtml_body
+
+        md = (
+            "本文です。\n\n014\n\n２０２\n\n  015  \n\n2024年に始まった。\n\n"
+            "5\n\n12345\n\n| a | b |\n|---|---|\n| 100 | 200 |\n\n"
+            "- 300\n- 400\n\n<p>500</p>\n\n# 600\n\n本文\n123\n"
+        )
+        html = md_to_xhtml_body(md)
+        for gone in ("<p>014</p>", "<p>２０２</p>", "<p>015</p>"):
+            assert gone not in html
+        assert "2024年に始まった" in html
+        assert "12345" in html  # 5 桁は年号・金額などの可能性があり対象外
+        assert "<td>100</td>" in html and "<li>300</li>" in html  # 表・リスト
+        assert "<p>500</p>" in html and "<h1>600</h1>" in html
+        assert "123" in html  # 段落内の 1 行は段落の一部
+
+    def test_running_head_equal_to_title_is_dropped_but_heading_kept(self) -> None:
+        from book_epub.converter import md_to_xhtml_body
+
+        md = "# 体調管理の本\n\n体調管理の本\n\n 体調管理の本 \n\n体調管理の本を読む。\n"
+        html = md_to_xhtml_body(md, title="体調管理の本")
+        assert "<h1>体調管理の本</h1>" in html
+        assert "<p>体調管理の本</p>" not in html
+        assert "体調管理の本を読む" in html
+        # title 未指定なら何も落とさない
+        assert "<p>体調管理の本</p>" in md_to_xhtml_body(md)

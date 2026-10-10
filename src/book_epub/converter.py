@@ -15,6 +15,10 @@ _BR_TAG_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
 # 空行で囲まれた「1 文字だけの段落」。縦書きの装飾見出し (「解決法」) が yomitoku で
 # 1 文字ずつの段落に割れたもの (issue #68)。本文で 1 文字だけの段落は正当には出ない
 _SINGLE_CHAR_PARAGRAPH_RE = re.compile(r"(?:(?<=\n\n)|^)[^\s#<|\-*>][ \t]*\n(?=\n|$)", re.MULTILINE)
+# 空行で囲まれた「数字だけ 2〜4 桁 (半角・全角)」の 1 行段落 = ノンブル (ページ番号)
+_PAGE_NUMBER_PARAGRAPH_RE = re.compile(
+    r"(?:(?<=\n\n)|^)[ \t]*[0-9０-９]{2,4}[ \t]*\n(?=\n|$)", re.MULTILINE
+)
 
 
 @dataclass(frozen=True)
@@ -46,14 +50,31 @@ def _drop_single_char_paragraphs(text: str) -> str:
     return _SINGLE_CHAR_PARAGRAPH_RE.sub("", text)
 
 
-def md_to_xhtml_body(markdown_text: str) -> str:
+def _drop_page_numbers(text: str) -> str:
+    """ノンブル (数字だけ 2〜4 桁の段落) を落とす。読み上げで邪魔になるため。"""
+    return _PAGE_NUMBER_PARAGRAPH_RE.sub("", text)
+
+
+def _drop_running_head(text: str, title: str | None) -> str:
+    """書名と完全一致 (前後空白除く) する 1 行段落 (柱) を落とす。`# 書名` 見出しは残す。"""
+    if not title or not title.strip():
+        return text
+    pattern = re.compile(
+        r"(?:(?<=\n\n)|^)[ \t]*" + re.escape(title.strip()) + r"[ \t]*\n(?=\n|$)", re.MULTILINE
+    )
+    return pattern.sub("", text)
+
+
+def md_to_xhtml_body(markdown_text: str, title: str | None = None) -> str:
     """Markdown を HTML 本文（body 内側）に変換する。表の html は素通し。
 
     yomitoku 由来の行折り返し `<br>`（原本のレイアウト都合の強制改行）は
     リフロー表示を破綻させるため、変換前に除去する。装飾見出しが割れてできた
-    1 文字だけの段落も落とす (issue #68)。
+    1 文字だけの段落も落とす (issue #68)。読み上げの邪魔になるノンブルと、
+    `title` と一致する柱も落とす。
     """
     text = _drop_single_char_paragraphs(_strip_forced_linebreaks(markdown_text))
+    text = _drop_running_head(_drop_page_numbers(text), title)
     return str(md_lib.markdown(text, extensions=["tables"]))
 
 
