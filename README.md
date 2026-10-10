@@ -15,7 +15,8 @@ macOS の Amazon Kindle アプリで表示中の書籍を、ページ送りと�
 - 書籍末尾を自動検出して停止（ページ数の事前指定は不要。`--max-pages` は保険の上限）
 - 撮影中に Kindle を前面に出さない（既定の `--background`）。Kindle の窓を他の窓の裏に置いたまま、Mac で別の作業をしながら回せる
 - `img2pdf` で PNG をストリーム出力で結合（1000 ページでもメモリ使用量は一定）
-- 撮影中は `[i/N] capturing page` のリアルタイム進捗表示
+- 撮影中は `[i/上限] capturing page` のリアルタイム進捗表示（分母は `--max-pages` で、実際のページ数ではない）
+- 本を開いた直後に出る読書位置の同期シート（「最新の位置に移動」等）は自動で閉じる
 
 ## 必要環境（最低条件）
 
@@ -33,7 +34,7 @@ macOS の Amazon Kindle アプリで表示中の書籍を、ページ送りと�
 |---|---|
 | マシン | MacBook Air (Apple M1, 8 GB RAM) |
 | OS | macOS 26.0.1 (Tahoe) |
-| Kindle.app | 7.50 |
+| Kindle.app | 7.68（背面撮影・kindle-cap-all の実測。7.50 は v0.7.0 以前の前面撮影で確認） |
 | ディスプレイ | 内蔵 Retina LCD（物理 2560x1600 / 論理 1440x900）単体使用 |
 
 ## 未検証の組み合わせ（理論上動くはずだが報告なし）
@@ -45,7 +46,7 @@ macOS の Amazon Kindle アプリで表示中の書籍を、ページ送りと�
 
 ### 環境依存の補足
 
-実装上、コード自体は **マウス位置やディスプレイサイズに直接依存しません**。Kindle ウィンドウの絶対座標を毎ページ取り直し、`screencapture -R x,y,w,h` でその範囲を撮影するだけです。ただし以下は環境による:
+実装上、コード自体は **マウス位置やディスプレイサイズに直接依存しません**。既定の `--background` は Kindle の窓 ID を指定してその窓だけを撮影し、`--foreground` では Kindle ウィンドウの絶対座標を毎ページ取り直して `screencapture -R x,y,w,h` でその範囲を撮影します。ただし以下は環境による:
 
 - **撮影 PNG の解像度**: Retina なら 2x、non-Retina なら 1x（PDF の画質に影響）
 - **キャプチャ速度**: マシン性能（M1 ≦ M3 Pro 等）
@@ -104,6 +105,7 @@ output/my-book.pdf
 | `--pdf-jpeg-quality N` | | （未指定） | PDF 埋め込み画像を JPEG quality N (1-100) で再圧縮。未指定時は lossless PNG 埋め込み。**テキスト書籍は 80 程度推奨で PDF サイズが ~1/10 に** (issue #50) |
 | `--progress / --no-progress` | | `--no-progress` | `--pdf-jpeg-quality` 指定時の JPEG 変換ループ進捗を `tqdm` で stderr に表示。1000+ ページ書籍で「ハングしたのか」を判別できるようにする (issue #53) |
 | `--background / --foreground` | | `--background` | `--background` は Kindle を前面に出さず、窓 ID 指定のキャプチャと Kindle 宛てのキー送信で撮る。他の窓で覆っていてもよいが、隠す（Cmd+H）・最小化・別のデスクトップへ移すと撮れないので、戻るまで待つ（警告を出す）。`--foreground` は従来の前面撮影（画面領域キャプチャ） (issue #84) |
+| `--verbose` / `-v`、`--quiet` / `-q`、`--log-file PATH` | | off | DEBUG ログ（osascript の入出力が見える）/ WARNING 以上のみ / ログをファイルにも記録（長時間ジョブの保険） |
 | `--crop-top N` | | `0` | 撮影矩形の上端から N 論理ポイント削る。固定型書籍でウィンドウ左上の信号機ボタンが写り込む場合に指定。まず `--dry-run` で `output/dry_run.png` を見て値を決める（Retina でもポイント単位のまま） (issue #69) |
 
 ※ `--direction` または `--auto-direction` のいずれかが必須（同時指定はエラー）
@@ -133,6 +135,7 @@ uv run kindle-cap-all --include-pdf
 - 綴じ方向と先頭は自動判定: 前ページキーを画面が変わらなくなるまで送り、リーダーのステータス文（`N ページ中の M ページ目`）で先頭か末尾かを見分ける
 - 末尾は `kindle-cap` と同じ「同一ページが 2 回続く」で検出。`--max-pages`（既定 3000）は保険
 - 撮影ループ中は Kindle を前面に出さない（既定の `--background`）。本を開く・先頭に戻す・閉じる工程だけ一瞬前面に出てキー入力を受けるので、その数秒だけ入力を控える。Kindle の窓は隠さず・最小化せず・同じデスクトップに置いておく（`&&` で `book-ocr` を続けて放置運用するのにも向く）
+- 本を開いた直後に出る読書位置の同期シート（「最新の位置に移動」等）は自動で閉じる
 - 副作用: 撮影した本の読書位置は末尾に移る（Kindle 側の「読了」扱いになる）。読みかけの本は後で位置を戻すこと
 - 飛ばすもの: サンプル本（書籍情報シートが割り込むなど挙動が違う）、`巻`（漫画などのシリーズ。**方針として対象外**で、対応予定なし）、既定では Send to Kindle した PDF
 - 要件: システム設定 > プライバシーとセキュリティ > アクセシビリティ でターミナルを許可。Amazon Kindle.app 7.68 で実測（UI 構造が変わると追従が必要）
@@ -207,7 +210,7 @@ uv run book-ocr output/my-book/ --skip-existing --searchable-pdf
 | `--name TEXT` | book_dir の basename | 書籍名（Markdown ファイル名と index.json に反映） |
 | `--device mps\|cpu\|cuda` | `mps` | OCR 推論デバイス（Apple Silicon は `mps` 推奨） |
 | `--reading-order auto\|left2right\|top2bottom\|right2left` | `auto` | 読み順（自動検出推奨） |
-| `--page-order auto\|rtl\|ltr\|off` | `auto` | 見開きキャプチャのページ順。`auto` は縦書きが多ければ右ページ先。片方のページを全部読んでからもう片方へ進み、縦書き 2 段組で上段末尾と下段先頭に割れた段落は連結し、縦書き本文より上にあるページ見出しは先頭に移す。`off` で yomitoku の順のまま (issue #95) |
+| `--page-order auto\|rtl\|ltr\|off` | `auto` | 見開きキャプチャのページ順。`auto` は縦書きが多ければ右ページ先。片方のページを全部読んでからもう片方へ進み、縦書き 2 段組で上段末尾と下段先頭に割れた段落は連結し、縦書き本文より上にあるページ見出しは先頭に移す。`off` で yomitoku の順のまま。既存の md に適用するには `--skip-existing` を外して再実行（再 OCR）が必要 (issue #95) |
 | `--ignore-meta / --no-ignore-meta` | `--ignore-meta` | Kindle のヘッダー/フッターを除外 |
 | `--out PATH` | `<book_dir>` | 出力先（省略時は book_dir に書き戻す） |
 | `--chunk-size N` | None | ページを N 枚ずつ分割して OCR (issue #36)。巨大本で timeout 回避＆スケール改善 |
@@ -229,7 +232,7 @@ uv run book-ocr output/my-book/ --skip-existing --searchable-pdf
 - 縦書き・横書きどちらも対応
 - yomitoku の `subprocess.run(timeout=1800s)` で各 chunk が中断されるため、`--chunk-size 50` だと 1 chunk あたり ~16 分で安全マージン内
 
-詳細な PoC レポートは [`docs/ocr-bench/2026-04-28.md`](docs/ocr-bench/2026-04-28.md) を参照。
+詳細な PoC レポートは [`docs/ocr-bench/2026-04-28.md`](docs/ocr-bench/2026-04-28.md)、読み順の実験は [`docs/ocr-bench/2026-10-11-reading-order.md`](docs/ocr-bench/2026-10-11-reading-order.md) を参照。
 
 ### book-epub — 読み上げ可能な図表入り EPUB を生成（オプション）
 
@@ -255,6 +258,7 @@ uv run book-epub output/my-book/ --title "正式な書名" --author "著者名"
   読み上げ対象の本文として図の近くに配置される
 - `figures/` が無い書籍（v0.3.x 以前に OCR したもの）は警告つきでテキストのみの
   EPUB になる。図表入りにするには `book-ocr` を再実行する
+- 空行で囲まれた 1 文字だけの段落（縦書きの装飾見出しが 1 文字ずつに割れたものや、図中ラベルの OCR ゴミ）は XHTML 変換時に落とす。`pages/*.md` は変更しない
 - 縦書き表示は未対応（読み上げ用途では横書きで実用上問題なし）
 
 ### よくある使い方
@@ -283,14 +287,14 @@ uv run kindle-cap --name my-book --auto-direction --pdf-jpeg-quality 80 \
 CLI (typer)
   ↓ CaptureConfig
 Orchestrator
-  ↓ preflight → for i in 1..N: activate → geometry → capture → arrow → wait
-window.py / capture.py / keys.py / preflight.py
-  ↓ subprocess
-osascript / screencapture
+  ↓ preflight → 開始時に 1 回 activate → for i in 1..max-pages: capture → arrow → wait（同一ページが 2 回続いたら終端として停止）
+window.py / capture.py / keys.py / background.py / preflight.py
+  ↓ subprocess / Quartz
+osascript / screencapture / CGWindowListCreateImage / CGEventPostToPid
 ```
 
-- `osascript` で Kindle ウィンドウを前面化＋位置を取得
-- `screencapture -R x,y,w,h -x` でウィンドウ範囲をキャプチャ
+- 既定の `--background`: 開始時に 1 回だけ `osascript` で Kindle を前面化し、以後は窓 ID 指定の `CGWindowListCreateImage` で撮影、pid 宛ての `CGEventPostToPid` でページ送りキーを送る（前面化・マウス退避は毎ページやらない）
+- `--foreground`: 毎ページ `osascript` で前面化＋ウィンドウ位置を取得し、`screencapture -R x,y,w,h -x` で範囲をキャプチャ、`System Events` でキーを送る
 - 撮影直後に Pillow で RGB に flatten（`img2pdf` 警告と PDF 肥大化を回避）
 - ページ送り後は `--wait` 秒だけ待機
 - 全ページ撮り終わったら `img2pdf` でストリーム出力 PDF 結合
@@ -299,8 +303,9 @@ osascript / screencapture
 
 ## 既知の制約
 
-- **メニュー映り込み**: ウィンドウ全体を撮るため、Kindle のメニューバーやタイトルバー（信号機ボタン）が含まれる。上端だけなら `--crop-top N` で削れる（値は `--dry-run` で確認）
-- **モード崩れに注意**: 撮影中にユーザーが他アプリを最前面にすると矢印キーが他アプリに飛ぶ可能性（毎回 `activate` で緩和してるが完全ではない）
+- **タイトルバー映り込み**: 窓の内容を撮るため、タイトルバー（信号機ボタン）が上端に含まれる（既定の `--background` では窓の外にあるメニューバーは写らない）。`--crop-top N` で削れる（値は `--dry-run` で確認。実測では 28）
+- **窓を隠さない**: 既定の `--background` では Kindle の窓を隠す（Cmd+H）・最小化する・別のデスクトップへ移すと撮れず、戻るまで警告を出して待つ。他の窓で覆うのは可
+- **モード崩れに注意（`--foreground` のみ）**: 撮影中にユーザーが他アプリを最前面にすると矢印キーが他アプリに飛ぶ可能性（毎回 `activate` で緩和してるが完全ではない）
 - **マルチディスプレイ対応**: 仮想スクリーン全体の座標系で動作する設計（純粋関数レベルでテスト済）。実機検証は単一ディスプレイで実施
 - **アニメーションが重い書籍**: `--wait` を上げると安全
 - **アクセシビリティ権限**: ターミナルに権限が必要。初回は OS の許可ダイアログを操作
