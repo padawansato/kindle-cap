@@ -152,3 +152,14 @@ class TestDropReadAloudNoise:
         assert "<p>体調管理</p>" in html  # 部分一致は落とさない
         # title 未指定なら書名段落は残る
         assert f"<p>{title}</p>" in md_to_xhtml_body(md)
+
+
+def test_single_char_last_line_of_multiline_paragraph_is_kept() -> None:
+    """MULTILINE の `^` は段落途中の行頭にも当たり、複数行段落の最終行が 1 文字だと
+    その行だけ落ちていた (#107 の調査で判明)。段落先頭は文字列先頭か空行の直後に限る"""
+    from book_epub.converter import md_to_xhtml_body
+
+    html = md_to_xhtml_body("一行目\n二行目\n三\n\n次の段落。")
+    assert "三" in html and "二行目" in html
+    # 単独の 1 文字段落は引き続き落ちる (文字列末尾に改行が無くても)
+    assert "<p>決</p>" not in md_to_xhtml_body("本文。\n\n決")

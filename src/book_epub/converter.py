@@ -14,7 +14,11 @@ _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _BR_TAG_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
 # 空行で囲まれた「1 文字だけの段落」。縦書きの装飾見出し (「解決法」) が yomitoku で
 # 1 文字ずつの段落に割れたもの (issue #68)。本文で 1 文字だけの段落は正当には出ない
-_SINGLE_CHAR_PARAGRAPH_RE = re.compile(r"(?:(?<=\n\n)|^)[^\s#<|\-*>][ \t]*\n(?=\n|$)", re.MULTILINE)
+# 段落先頭は文字列先頭 (\A) か空行の直後に限る。MULTILINE の ^ だと段落途中の行頭にも当たり、
+# 複数行段落の最終行が 1 文字だとその行だけ落ちていた (#107 の調査で判明)
+_SINGLE_CHAR_PARAGRAPH_RE = re.compile(
+    r"(?:(?<=\n\n)|\A)[^\s#<|\-*>][ \t]*(?:\n(?=\n|$)|\Z)", re.MULTILINE
+)
 # 空行で囲まれた「2〜4 桁の数字だけの段落」。ノンブル（ページ番号）や原本目次のページ番号で、
 # 読み上げると本文の流れを切る。1 桁は _SINGLE_CHAR_PARAGRAPH_RE が拾う。5 桁以上は対象外
 _PAGE_NUMBER_PARAGRAPH_RE = re.compile(
