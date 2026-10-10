@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-10-11
+
 ### Fixed
 
 - `book-ocr --page-order`：縦書き 2 段組の段落連結で、下段の先頭が箇条書き記号（`○` `●` `・` など）や開き括弧で始まる段落は文の続きではないので連結しないようにした。実書籍 93 ページの連結候補 139 件を抽出して目視したところ、誤連結はすべて `○` で始まる箇条書き項目だった（issue #95）
@@ -187,7 +189,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/padawansato/kindle-cap/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/padawansato/kindle-cap/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/padawansato/kindle-cap/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/padawansato/kindle-cap/compare/v0.10.0...v0.11.0
