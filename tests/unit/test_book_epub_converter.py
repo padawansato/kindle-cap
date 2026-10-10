@@ -110,3 +110,45 @@ class TestDropSingleCharParagraphs:
         # 空行で区切られていない行は段落の一部なので落とさない
         html = md_to_xhtml_body("一\n二\n三")
         assert "一" in html and "二" in html and "三" in html
+
+
+class TestDropReadAloudNoise:
+    """読み上げ (Assistive Reader) で邪魔になるノンブル・書名の柱の段落を落とす"""
+
+    def test_page_number_paragraphs_are_dropped_but_numbers_in_text_kept(self) -> None:
+        from book_epub.converter import md_to_xhtml_body
+
+        md = (
+            "2024年に調査が行われた。\n\n014\n\n 141 \n\n０２３\n\n2026\n\n"
+            "7\n\n12345\n\n寝る前の 30 分が大事だ。\n\n123\n456\n"
+        )
+        html = md_to_xhtml_body(md)
+        assert "<p>014</p>" not in html and "141" not in html  # 3 桁・前後空白つき
+        assert "０２３" not in html  # 全角数字
+        assert "<p>2026</p>" not in html  # 4 桁まで
+        assert "<p>12345</p>" in html  # 5 桁は残す
+        assert "<p>7</p>" not in html  # 1 桁は既存の 1 文字段落除去が拾う
+        assert "2024年に調査" in html and "30 分が大事" in html
+        assert "123" in html and "456" in html  # 複数行の段落は対象外
+
+    def test_numbers_in_heading_table_and_list_are_kept(self) -> None:
+        from book_epub.converter import md_to_xhtml_body
+
+        md = "# 100\n\n| 項目 | 値 |\n|---|---|\n| 歩数 | 1000 |\n\n- 200\n\n<p>300</p>\n"
+        html = md_to_xhtml_body(md)
+        assert "<h1>100</h1>" in html
+        assert "<td>1000</td>" in html
+        assert "<li>200</li>" in html
+        assert "<p>300</p>" in html
+
+    def test_running_head_matching_title_is_dropped_but_heading_kept(self) -> None:
+        from book_epub.converter import md_to_xhtml_body
+
+        title = "体調管理の本"
+        md = f"# {title}\n\n{title}\n\n  {title} \n\n{title}を読む。\n\n体調管理\n"
+        html = md_to_xhtml_body(md, title=title)
+        assert html.count(title) == 2  # 見出しと本文中の言及だけ残る
+        assert f"<h1>{title}</h1>" in html and f"{title}を読む" in html
+        assert "<p>体調管理</p>" in html  # 部分一致は落とさない
+        # title 未指定なら書名段落は残る
+        assert f"<p>{title}</p>" in md_to_xhtml_body(md)
