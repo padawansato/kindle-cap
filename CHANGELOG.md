@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-11
+
 ### Added
 
 - `kindle-cap-all --restore-position/--no-restore-position`（既定 on）：本を開いた直後の読書位置を記録し、撮影後にリーダーの「その他のオプション」→「次の位置No.に移動:」ダイアログで元の位置へ戻してから閉じるようにした。これまでは撮影した本の読書位置が末尾に移り、読みかけの本で困っていた。位置が読めない（表紙）・先頭だった本は戻さず、復元に失敗しても撮影結果は残す。位置番号の本で実測、固定ページの本は未検証
@@ -216,7 +218,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/padawansato/kindle-cap/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/padawansato/kindle-cap/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/padawansato/kindle-cap/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/padawansato/kindle-cap/compare/v0.13.1...v0.14.0
