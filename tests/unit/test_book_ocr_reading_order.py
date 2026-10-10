@@ -109,6 +109,8 @@ def test_single_page_is_left_untouched_except_tier_join() -> None:
         ("…実", "際に障", None, True),
         ("…す。", "際に障", None, False),  # 句点で終わる
         ("…実", "　際に障", None, False),  # 全角スペース = 新しい段落
+        ("…声を", "○生活習慣を見直す", None, False),  # 箇条書きの項目は文の続きではない
+        ("…とい", "「文章を書くのが", None, False),  # 開き括弧も同様
         ("…実", "際に障", "section_headings", False),  # 見出しは連結しない
     ],
 )
