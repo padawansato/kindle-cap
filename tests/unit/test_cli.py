@@ -49,11 +49,13 @@ def test_capture_with_all_flags(mock_run: MagicMock, tmp_path: Path) -> None:
             "rtl",
             "--out",
             str(tmp_path),
+            "--foreground",
         ],
     )
     assert result.exit_code == 0, result.output
     config_arg = mock_run.call_args.args[0]
     assert config_arg.name == "test-book"
+    assert config_arg.background is False
     assert config_arg.pages == 3000  # --max-pages 既定
     assert config_arg.direction.value == "rtl"
     assert config_arg.out == tmp_path
@@ -265,6 +267,7 @@ def test_capture_without_max_pages_uses_ceiling_and_auto_stop(
     result = runner.invoke(app, ["--name", "x", "--auto-direction", "--out", str(tmp_path)])
     assert result.exit_code == 0, result.output
     assert mock_run.call_args.args[0].pages == 3000
+    assert mock_run.call_args.args[0].background is True  # 既定は背面撮影 (issue #84)
     assert mock_run.call_args.kwargs.get("auto_stop") is True
     assert mock_run.call_args.kwargs.get("auto_direction") is True
 

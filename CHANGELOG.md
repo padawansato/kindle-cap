@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `kindle-cap` / `kindle-cap-all --background`（既定）：撮影中に Kindle を前面に出さなくなった。`screencapture -R`（画面領域）の代わりに窓 ID 指定の `CGWindowListCreateImage`、`System Events key code`（前面アプリ宛て）の代わりに pid 宛ての `CGEventPostToPid` を使うので、Kindle の窓を他の窓の裏に置いたまま Mac で別の作業をしながら回せる。毎ページの `activate` とマウス退避も無くなった。窓を隠す（Cmd+H）・最小化する・別のデスクトップに移すと撮れないので、その間は失敗にせず警告を出して表示されるまで待つ。`kindle-cap-all` では本を開く・先頭に戻す・閉じる工程だけ従来どおり一瞬前面に出る（ライブラリの AXPress は前面でないと選択モードになるため）。従来の挙動は `--foreground`（issue #84）
+
 ## [0.8.0] - 2026-10-11
 
 ### Changed

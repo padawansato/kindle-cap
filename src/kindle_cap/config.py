@@ -30,6 +30,8 @@ class CaptureConfig:
     progress: bool = False
     # issue #69: 撮影矩形の上端から削る量 (論理ポイント)。タイトルバー / 信号機ボタン除外用
     crop_top: int = 0
+    # issue #84: True なら Kindle を前面に出さず、窓 ID 指定キャプチャ + pid 宛てキーで撮る
+    background: bool = True
 
     def __post_init__(self) -> None:
         if self.pages <= 0:

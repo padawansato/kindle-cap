@@ -125,6 +125,15 @@ def capture(
             "まず --dry-run で値を確認 (issue #69)"
         ),
     ),
+    background: bool = typer.Option(
+        True,
+        "--background/--foreground",
+        help=(
+            "--background (既定): Kindle を前面に出さず、他の窓の裏に置いたまま撮る。"
+            "Mac を使いながら回せるが、Kindle の窓を隠す・最小化する・別のデスクトップに"
+            "移すと撮れないので表示されるまで待つ。--foreground は従来の前面撮影 (issue #84)"
+        ),
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -169,6 +178,7 @@ def capture(
             pdf_jpeg_quality=pdf_jpeg_quality,
             progress=progress,
             crop_top=crop_top,
+            background=background,
         )
     except ValueError as e:
         raise typer.BadParameter(str(e)) from e
@@ -275,6 +285,14 @@ def capture_all(
     crop_top: int = typer.Option(
         0, "--crop-top", help="撮影矩形の上端から削る量 (論理ポイント、issue #69)"
     ),
+    background: bool = typer.Option(
+        True,
+        "--background/--foreground",
+        help=(
+            "--background (既定): 撮影ループ中は Kindle を前面に出さない。本を開く・閉じる・"
+            "先頭に戻す工程だけ一瞬前面に出る。--foreground は従来どおり (issue #84)"
+        ),
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="DEBUG レベルログを有効化"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="WARNING 以上のみ出力"),
     log_file: Path | None = typer.Option(
@@ -290,6 +308,7 @@ def capture_all(
     _setup_logging(verbose=verbose, quiet=quiet, log_file=log_file)
     # PyObjC (アクセシビリティ API) はこのコマンドでしか使わないので遅延 import
     from . import ax, library
+    from .background import post_key
     from .reader import parse_status, rewind_to_start
     from .window import get_window_geometry
 
@@ -369,13 +388,19 @@ def capture_all(
             pdf_jpeg_quality=pdf_jpeg_quality,
             progress=progress,
             crop_top=crop_top,
+            background=background,
         )
 
         def before_capture() -> None:
-            # サンプル末尾などで被さるシートを閉じる。閉じた直後は chrome が出るので隠す
+            # サンプル末尾などで被さるシートを閉じる。閉じた直後は chrome が出るので隠す。
+            # background では osascript の key code (前面アプリに届く) とマウス移動を避け、
+            # pid 宛ての Escape だけ送る
             if library.dismiss_sheet(app):
-                ax.press_escape()
-                ax.park_mouse(*geometry())
+                if background:
+                    post_key(ax._KEY_ESCAPE)
+                else:
+                    ax.press_escape()
+                    ax.park_mouse(*geometry())
                 sleep(0.5)
 
         orchestrator_run(config, auto_stop=True, before_capture=before_capture)
