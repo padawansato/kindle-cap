@@ -29,6 +29,9 @@ _PROGRESS_RE = re.compile(r"(\d+)パーセント")
 _DOWNLOADED = "ダウンロードされました"
 _NOT_DOWNLOADED = "本はダウンロードされていません"
 _CLOSE_BOOK = "本を閉じる"
+# Kindle が前面でない時にライブラリの書籍ボタンを AXPress すると、開く代わりに
+# 選択モード (「N件の選択されたアイテム」「キャンセル」「アクション」) になる (issue #84)
+_CANCEL_SELECTION = "キャンセル"
 _CLOSE_SHEET = "閉じる"  # 書籍情報シート (サンプルを開くと出る) の閉じるボタン
 # 読書位置の同期シート (本を開いた直後に出る。「最新の位置に移動」/「位置Nに戻る」)。
 # ハンドルも「閉じる」と名乗るが AXPress は効かず、Escape で消える (issue #86)
@@ -193,8 +196,24 @@ def _press_book(app: ax.AXElement, book: Book) -> ax.AXElement:
         time.sleep(0.8)
         button = _visible_button(app, book) or button
     logger.debug("press: inside=%s", _fully_inside_window(app, button))
+    # 背面撮影 (issue #84) 中にユーザーが別アプリを前面にしていると、AXPress が
+    # 「開く」ではなく選択モードになる。押す直前に必ず前面に出す
+    ax.activate()
+    time.sleep(0.3)
+    cancel_selection(app)
     ax.perform(button, "AXPress")
     return button
+
+
+def cancel_selection(app: ax.AXElement) -> bool:
+    """ライブラリが選択モードになっていれば「キャンセル」を押して戻す。戻したら True."""
+    buttons = ax.find(app, "AXButton", lambda d: d == _CANCEL_SELECTION)
+    if not buttons:
+        return False
+    logger.info("ライブラリの選択モードを解除します")
+    ax.perform(buttons[0], "AXPress")
+    time.sleep(0.5)
+    return True
 
 
 def in_reader(app: ax.AXElement) -> bool:
@@ -211,8 +230,7 @@ def open_book(
 ) -> None:
     """書籍ボタンを押して開く。未ダウンロードなら 1 回目の押下で DL が始まるので、
     「ダウンロードされました」になるまで待ってもう一度押す。"""
-    button = _find_button(app, book)
-    ax.perform(button, "AXPress")
+    _press_book(app, book)
     if not book.downloaded:
         logger.info("ダウンロード待ち: %s", book.title)
         deadline = time.monotonic() + download_timeout
@@ -225,7 +243,7 @@ def open_book(
                 raise TimeoutError(
                     f"ダウンロードが {download_timeout:.0f} 秒で終わりません: {book.title}"
                 )
-        ax.perform(button, "AXPress")
+        _press_book(app, book)
     deadline = time.monotonic() + 60.0
     while not in_reader(app):
         logger.debug("リーダー待ち: visible_books=%d", len(visible_books(app)))
@@ -261,6 +279,8 @@ def dismiss_sheet(app: ax.AXElement) -> bool:
 
 def close_book(app: ax.AXElement, *, geometry: tuple[int, int, int, int]) -> None:
     """chrome を出して「本を閉じる」を押し、ライブラリに戻る."""
+    ax.activate()  # 背面撮影の後はユーザーの別アプリが前面にいることがある (issue #84)
+    time.sleep(0.3)
     for _ in range(3):
         dismiss_sheet(app)
         ax.sweep_mouse(*geometry)
