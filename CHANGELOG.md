@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-11
+
 ### Changed
 
 - docs: README を v0.8.0〜v0.13.1 の挙動に合わせて整合した。「仕組み」「既知の制約」「環境依存の補足」を背面撮影（`--background`）前提に直し、進捗表示の分母・ログ系オプション・同期シート自動クローズ・`book-epub` の 1 文字段落除去・`--page-order` の再 OCR 注意・読み順レポートへのリンクを追記
@@ -194,7 +196,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/padawansato/kindle-cap/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/padawansato/kindle-cap/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/padawansato/kindle-cap/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/padawansato/kindle-cap/compare/v0.11.0...v0.12.0
