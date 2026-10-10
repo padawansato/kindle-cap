@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-10
+
 ### Added
 
 - `kindle-cap-all`：Kindle.app のライブラリにある書籍を一括でキャプチャする新コマンド。本を 1 冊ずつ手で開いて 1 ページ目を出す準備が不要になった。ライブラリ画面をアクセシビリティ API（PyObjC）で読み取って書籍を列挙し、順に「開く（未ダウンロードならダウンロード）→ 前ページキーで先頭まで戻す → `--auto-stop` 相当で全ページ撮影 → PDF → 閉じる」を回す。綴じ方向はリーダーのステータス文（`N ページ中の M ページ目`）と画面ハッシュから自動判定。既に `output/<書籍名>.pdf` がある本は飛ばすので再実行で続きから進む。`--list` で対象の確認、`--only` / `--limit` / `--include-pdf` で絞り込み。サンプル本（挙動が違う）とシリーズ（巻一覧）は飛ばす
@@ -134,7 +136,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/padawansato/kindle-cap/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/padawansato/kindle-cap/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/padawansato/kindle-cap/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/padawansato/kindle-cap/compare/v0.4.0...v0.5.0
