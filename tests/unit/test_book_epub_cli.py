@@ -93,3 +93,40 @@ def test_cli_skip_pages_is_applied_and_invalid_spec_exits_nonzero(tmp_path: Path
 
     result = runner.invoke(app, [str(book_dir), "--skip-pages", "x"])
     assert result.exit_code != 0
+
+
+def test_cli_joins_sentence_split_across_pages_unless_disabled(tmp_path: Path) -> None:
+    from ebooklib import epub
+
+    book_dir = _make_book_dir(tmp_path)
+    pages = book_dir / "pages"
+    (pages / "page_001.md").write_text(
+        "<!-- page:001 -->\n\n# 第1章\n\nページ末尾で切れ<br>た文の前", encoding="utf-8"
+    )
+    (pages / "page_002.md").write_text(
+        "<!-- page:002 -->\n\n半はここに続く。\n\n次の段落。", encoding="utf-8"
+    )
+
+    def bodies(dest: Path) -> dict[str, str]:
+        return {
+            item.get_name(): item.get_content().decode("utf-8")
+            for item in epub.read_epub(str(dest)).get_items()
+            if item.get_type() == 9  # ITEM_DOCUMENT
+        }
+
+    joined = tmp_path / "joined.epub"
+    result = runner.invoke(app, [str(book_dir), "--out", str(joined)])
+    assert result.exit_code == 0, result.output
+    docs = bodies(joined)
+    assert "<p>ページ末尾で切れた文の前半はここに続く。</p>" in docs["page_001.xhtml"]
+    assert "半はここに続く" not in docs["page_002.xhtml"]
+    assert "<p>次の段落。</p>" in docs["page_002.xhtml"]
+    # pages/*.md (OCR の正準出力) は書き換えない
+    assert "半はここに続く。" in (pages / "page_002.md").read_text(encoding="utf-8")
+
+    separate = tmp_path / "separate.epub"
+    result = runner.invoke(app, [str(book_dir), "--no-join-pages", "--out", str(separate)])
+    assert result.exit_code == 0, result.output
+    docs = bodies(separate)
+    assert "<p>ページ末尾で切れた文の前</p>" in docs["page_001.xhtml"]
+    assert "<p>半はここに続く。</p>" in docs["page_002.xhtml"]
