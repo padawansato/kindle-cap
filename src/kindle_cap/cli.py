@@ -63,7 +63,6 @@ def _setup_logging(*, verbose: bool, quiet: bool, log_file: Path | None) -> None
 
 
 def capture(
-    pages: int = typer.Option(..., "--pages", help="撮影ページ数"),
     direction: Direction | None = typer.Option(
         None,
         "--direction",
@@ -92,10 +91,13 @@ def capture(
         "--dry-run",
         help="1 枚だけ撮影し PDF は作らない",
     ),
-    auto_stop: bool = typer.Option(
-        False,
-        "--auto-stop",
-        help="連続する 2 ページが同一なら書籍末尾と判断して停止",
+    max_pages: int = typer.Option(
+        3000,
+        "--max-pages",
+        help=(
+            "1 冊あたりの撮影上限 (保険)。末尾は連続する 2 ページが同一になったことで"
+            "自動検出して停止するので、通常は指定不要"
+        ),
     ),
     pdf_jpeg_quality: int | None = typer.Option(
         None,
@@ -159,7 +161,7 @@ def capture(
     try:
         config = CaptureConfig(
             name=name,
-            pages=pages,
+            pages=max_pages,
             direction=direction,
             wait=wait,
             out=out,
@@ -175,7 +177,7 @@ def capture(
         orchestrator_run(
             config,
             dry_run=dry_run,
-            auto_stop=auto_stop,
+            auto_stop=True,
             auto_direction=auto_direction,
         )
     except (
