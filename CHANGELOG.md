@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-11
+
 ### Changed
 
 - `book-epub`：空行で囲まれた 1 文字だけの段落（縦書きの装飾見出し「解決法」が「決」「法」に割れたものや、図中ラベルの OCR ゴミ）を XHTML 変換時に落とすようにした。実書籍 93 ページで 107 行が該当し、すべて本文ではなかった。`pages/*.md` は変更しない（issue #68）
@@ -169,7 +171,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/padawansato/kindle-cap/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/padawansato/kindle-cap/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/padawansato/kindle-cap/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/padawansato/kindle-cap/compare/v0.8.0...v0.9.0
