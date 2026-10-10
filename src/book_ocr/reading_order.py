@@ -12,6 +12,9 @@ Kindle の見開きキャプチャは 1 画像に左右 2 ページが入る。y
    横書きが多ければ左 (ltr)。`page_order` で明示もできる
 2. 同じページ内で読み順が隣り合う縦書き段落 A, B について、A が句点などで終わらず、
    B が A より下の段にあり、B が字下げで始まらなければ 1 段落に連結する
+3. 縦書き本文の半面で、本文のどの段落よりも上にある見出しはその半面の先頭に移す
+   (yomitoku はページ大見出しに遅い order を付けることがある)。横書き本文の半面は
+   多段組で順序自体が崩れていることが多く、見出しだけ動かしても良くならないので触らない
 
 `pages/page_NNN.json` 自体は書き換えない。md レンダの直前にメモリ上で適用する。
 """
@@ -110,6 +113,19 @@ def _find_continuation(
     return b
 
 
+def _hoist_headings(group: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """縦書き本文の半面で、本文より上にある見出しを先頭へ (相対順は保つ)。"""
+    body = [el for el in group if _is_body_vertical(el)]
+    if not body or not _mostly_vertical([el for el in group if "contents" in el]):
+        return group
+    top = min(el["box"][1] for el in body)
+    hoisted = [el for el in group if el.get("role") == "section_headings" and el["box"][3] <= top]
+    if not hoisted:
+        return group
+    rest = [el for el in group if el not in hoisted]
+    return hoisted + rest
+
+
 def fix_reading_order(raw: dict[str, Any], *, page_order: str = "auto") -> dict[str, Any]:
     """見開きのページ順を直し、割れた縦書き段落を連結した新しい dict を返す。
 
@@ -166,6 +182,14 @@ def fix_reading_order(raw: dict[str, Any], *, page_order: str = "auto") -> dict[
                 removed.add(id(b))
 
     kept = [el for el in elements if id(el) not in removed]
+
+    # 3. 縦書き本文の半面で、本文より上の見出しを先頭へ
+    if spread:
+        halves = [[el for el in kept if half(el) == h] for h in (first, 1 - first)]
+        kept = [el for h in halves for el in _hoist_headings(h)]
+    else:
+        kept = _hoist_headings(kept)
+
     for order, el in enumerate(kept):
         el["order"] = order
     out["paragraphs"] = [p for p in paragraphs if id(p) not in removed]

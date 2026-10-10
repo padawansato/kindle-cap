@@ -47,9 +47,9 @@ def test_vertical_spread_reads_right_page_first_and_joins_split_paragraph() -> N
     assert joined["contents"].startswith("発達障…って実\n際に障")
     assert joined["contents"].endswith("せん。")
     assert joined["box"] == [1621, 397, 2719, 1560]  # 両方の box の和
-    # 右ページの他の段落は元の順序 (0,1,2,3,4+20,21,22) を保つ
+    # 右ページは上端の大見出しが先頭に来て、本文は元の順序 (0,1,2,3,4+20,21,22) を保つ
     right = [p["contents"][:3] for _, _, p in seq if p["box"][0] > 1400 and "contents" in p]
-    assert right[:4] == ["本書で", "発達障", "発達障", "ADH"]
+    assert right[:5] == ["発達障", "本書で", "発達障", "発達障", "ADH"]
     # 入力は壊さない
     assert raw == _load()
 
@@ -143,3 +143,24 @@ def test_join_guards(a_tail: str, b_head: str, a_role: str | None, joined: bool)
     }
     fixed = fix_reading_order(copy.deepcopy(raw), page_order="rtl")
     assert (len(fixed["paragraphs"]) == 2) is joined
+
+
+def test_page_heading_above_vertical_body_moves_to_front_of_its_half() -> None:
+    """右ページ上端の大見出し「発達障害の種類」は yomitoku の order が 18 で、本文
+    5 段落目の後に来ていた。縦書き本文の半面では、本文より上にある見出しを先頭へ。
+    横書きの左ページ (多段組で順序自体が崩れている) には手を付けない"""
+    raw = _load()
+    fixed = fix_reading_order(raw, page_order="auto")
+    seq = [el for _, _, el in _by_order(fixed)]
+    right = [el for el in seq if el["box"][0] > 1400]
+    assert right[0].get("role") == "section_headings"
+    assert right[0]["contents"].startswith("発達障")
+    assert right[1]["contents"].startswith("本書で")  # 本文はその後に元の順で続く
+    # 左ページは元の相対順のまま (特徴/ADHD の見出しは動かさない)
+    left_before = [
+        el["contents"][:3]
+        for _, _, el in _by_order(raw)
+        if el["box"][0] <= 1400 and "contents" in el
+    ]
+    left_after = [el["contents"][:3] for el in seq if el["box"][0] <= 1400 and "contents" in el]
+    assert left_after == left_before

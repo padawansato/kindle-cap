@@ -207,7 +207,7 @@ uv run book-ocr output/my-book/ --skip-existing --searchable-pdf
 | `--name TEXT` | book_dir の basename | 書籍名（Markdown ファイル名と index.json に反映） |
 | `--device mps\|cpu\|cuda` | `mps` | OCR 推論デバイス（Apple Silicon は `mps` 推奨） |
 | `--reading-order auto\|left2right\|top2bottom\|right2left` | `auto` | 読み順（自動検出推奨） |
-| `--page-order auto\|rtl\|ltr\|off` | `auto` | 見開きキャプチャのページ順。`auto` は縦書きが多ければ右ページ先。片方のページを全部読んでからもう片方へ進み、縦書き 2 段組で上段末尾と下段先頭に割れた段落は連結する。`off` で yomitoku の順のまま (issue #95) |
+| `--page-order auto\|rtl\|ltr\|off` | `auto` | 見開きキャプチャのページ順。`auto` は縦書きが多ければ右ページ先。片方のページを全部読んでからもう片方へ進み、縦書き 2 段組で上段末尾と下段先頭に割れた段落は連結し、縦書き本文より上にあるページ見出しは先頭に移す。`off` で yomitoku の順のまま (issue #95) |
 | `--ignore-meta / --no-ignore-meta` | `--ignore-meta` | Kindle のヘッダー/フッターを除外 |
 | `--out PATH` | `<book_dir>` | 出力先（省略時は book_dir に書き戻す） |
 | `--chunk-size N` | None | ページを N 枚ずつ分割して OCR (issue #36)。巨大本で timeout 回避＆スケール改善 |
