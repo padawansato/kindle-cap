@@ -147,32 +147,57 @@ def _draw_words(page: pymupdf.Page, words: list[Word], png_path: Path, font: pym
 
     縮尺は PDF ページ寸法 ÷ OCR した PNG のピクセル寸法。PDF 側の画像が JPEG 再圧縮や
     縮小で別解像度になっていても、JSON の座標は PNG 基準なので正しく乗る。
+
+    TextWriter は語ごとではなく「縦横の向きが同じ連続する語の run」ごとに 1 つ
+    (語ごとに作ると 1000 ページで 2 分、run ごとなら 10 秒程度)。run 単位で書く順が
+    そのまま抽出順になるので読み順は保たれる。
     横書き: 語の幅にフォントサイズを合わせ、基線は下端 + descender。
-    縦書き: 列の上端を起点に横書きで組んでから、起点まわりに 90° 回して
-    上→下に流す (1 語 = 1 テキストオブジェクトなので抽出時に分断されない)。"""
+    縦書き: 1 語 = 1 テキストオブジェクトとして横に組み、write_text の morph で
+    run ごとにまとめて -90° 回す。morph の回転中心は 1 つなので、各語の起点は
+    逆回転した位置に置いておく (回転後に本来の起点へ戻る)。"""
     img_w, img_h = _png_size_px(png_path)
     sx = page.rect.width / img_w
     sy = page.rect.height / img_h
+    # 回転中心はページ中央 (逆回転した起点のはみ出しを最小にする)
+    pivot = (page.rect.top_left + page.rect.bottom_right) / 2
+    rotate = pymupdf.Matrix(-90)
+    # morph は PDF 座標 (y 上向き) で回すので、y 下向きの Point 演算では符号が逆になる
+    unrotate = (
+        pymupdf.Matrix(1, 0, 0, 1, -pivot.x, -pivot.y)
+        * pymupdf.Matrix(-90)
+        * pymupdf.Matrix(1, 0, 0, 1, pivot.x, pivot.y)
+    )
+
+    def flush(writer: pymupdf.TextWriter, vertical: bool) -> None:
+        if vertical:
+            writer.write_text(page, render_mode=3, morph=(pivot, rotate))
+        else:
+            writer.write_text(page, render_mode=3)
+
+    writer: pymupdf.TextWriter | None = None
+    run_vertical = False
     for w in words:
         unit = font.text_length(w.text, fontsize=1)
         if unit <= 0:
             continue
+        if writer is None or w.vertical != run_vertical:
+            if writer is not None:
+                flush(writer, run_vertical)
+            writer = pymupdf.TextWriter(page.rect)
+            run_vertical = w.vertical
         x0, y0, x1, y1 = w.bbox[0] * sx, w.bbox[1] * sy, w.bbox[2] * sx, w.bbox[3] * sy
-        tw = pymupdf.TextWriter(page.rect)
         if w.vertical:
             fontsize = (y1 - y0) / unit
-            # PyMuPDF は y 下向きなので Matrix(-90) で進行方向 (+x) が下 (+y) に向く。
             # 回転後、基線は x = fx の縦線で、descender は左 (-x)、字面は右 (+x) に出る。
             # fx を x0 から descender 分だけ内側に寄せて列 [x0, x1] に収める。
-            fx = x0 - font.descender * fontsize
-            origin = pymupdf.Point(fx, y0)
-            tw.append(origin, w.text, font=font, fontsize=fontsize)
-            tw.write_text(page, render_mode=3, morph=(origin, pymupdf.Matrix(-90)))
+            origin = pymupdf.Point(x0 - font.descender * fontsize, y0)
+            writer.append(origin * unrotate, w.text, font=font, fontsize=fontsize)
         else:
             fontsize = (x1 - x0) / unit
             baseline = y1 + font.descender * fontsize
-            tw.append(pymupdf.Point(x0, baseline), w.text, font=font, fontsize=fontsize)
-            tw.write_text(page, render_mode=3)
+            writer.append(pymupdf.Point(x0, baseline), w.text, font=font, fontsize=fontsize)
+    if writer is not None:
+        flush(writer, run_vertical)
 
 
 def _save(doc: pymupdf.Document, out_path: Path) -> None:
