@@ -272,3 +272,30 @@ class TestEngineSettings:
     def test_settings_includes_figure(self) -> None:
         assert YomiTokuEngine(figure=False).settings["figure"] is False
         assert YomiTokuEngine().settings["figure"] is True
+
+
+# ---------------------------------------------------------------------------
+# issue #95: page_order は manifest 経由で worker に渡り、index.json にも記録される
+# ---------------------------------------------------------------------------
+
+
+def test_page_order_is_recorded_in_settings_and_manifest(tmp_path: Path) -> None:
+    assert YomiTokuEngine().settings["page_order"] == "auto"
+    assert YomiTokuEngine(page_order="off").settings["page_order"] == "off"
+    with pytest.raises(ValueError):
+        YomiTokuEngine(page_order="sideways")
+    manifest = _build_render_manifest(
+        [(1, tmp_path / "page_001.png", tmp_path / "page_001.json")],
+        figure_parent=tmp_path,
+        figure_dir_name="figures",
+        export_figure=True,
+        page_order="rtl",
+    )
+    assert manifest["page_order"] == "rtl"
+    # 省略時は off (古い manifest との互換)
+    assert (
+        _build_render_manifest(
+            [], figure_parent=tmp_path, figure_dir_name="f", export_figure=False
+        )["page_order"]
+        == "off"
+    )

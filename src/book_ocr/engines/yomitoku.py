@@ -30,6 +30,7 @@ from typing import Any
 from tqdm import tqdm
 
 from book_ocr.models import PageText
+from book_ocr.reading_order import PAGE_ORDERS
 
 _BINARY_NAME = "yomitoku"
 _INPUT_DIR_NAME = "input"
@@ -65,10 +66,14 @@ class YomiTokuEngine:
     figure_out_dir: Path | None = None
     # OCR の生 JSON の保存先 (<book_dir>/pages)。None なら永続化しない (issue #70)
     json_out_dir: Path | None = None
+    # issue #95: 見開きのページ順 (auto/rtl/ltr) と縦書き 2 段組の段落連結。off で無効
+    page_order: str = "auto"
 
     def __post_init__(self) -> None:
         if self.chunk_size is not None and self.chunk_size < 1:
             raise ValueError(f"chunk_size must be >= 1 or None, got {self.chunk_size}")
+        if self.page_order not in PAGE_ORDERS:
+            raise ValueError(f"page_order must be one of {PAGE_ORDERS}, got {self.page_order!r}")
 
     @property
     def name(self) -> str:
@@ -94,6 +99,7 @@ class YomiTokuEngine:
             "chunk_size": self.chunk_size,
             "timeout_sec": self.timeout_sec,
             "figure": self.figure,
+            "page_order": self.page_order,
         }
 
     def run_batch(self, pngs: list[Path]) -> list[PageText]:
@@ -159,6 +165,7 @@ class YomiTokuEngine:
                 figure_parent=figures_dir.parent,
                 figure_dir_name=figures_dir.name,
                 export_figure=self.figure,
+                page_order=self.page_order,
             )
             markdown_by_page = self._render_markdown(binary, manifest, tmp_dir)
 
@@ -295,6 +302,7 @@ def _build_render_manifest(
     figure_parent: Path,
     figure_dir_name: str,
     export_figure: bool,
+    page_order: str = "off",
 ) -> dict[str, Any]:
     """md レンダ worker に渡す manifest を組み立てる純粋関数。
 
@@ -305,6 +313,7 @@ def _build_render_manifest(
     return {
         "export_figure": export_figure,
         "figure_dir_name": figure_dir_name,
+        "page_order": page_order,
         "pages": [
             {
                 "n": n,

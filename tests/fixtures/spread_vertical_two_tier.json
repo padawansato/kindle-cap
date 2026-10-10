@@ -1,0 +1,614 @@
+{
+ "paragraphs": [
+  {
+   "box": [
+    2505,
+    396,
+    2719,
+    944
+   ],
+   "contents": "本書で…ます。",
+   "direction": "vertical",
+   "order": 0,
+   "role": null
+  },
+  {
+   "box": [
+    2212,
+    396,
+    2484,
+    943
+   ],
+   "contents": "発達障…です。",
+   "direction": "vertical",
+   "order": 1,
+   "role": null
+  },
+  {
+   "box": [
+    2033,
+    396,
+    2189,
+    942
+   ],
+   "contents": "発達障…です。",
+   "direction": "vertical",
+   "order": 2,
+   "role": null
+  },
+  {
+   "box": [
+    1797,
+    396,
+    2010,
+    942
+   ],
+   "contents": "ADH…ます。",
+   "direction": "vertical",
+   "order": 3,
+   "role": null
+  },
+  {
+   "box": [
+    1621,
+    397,
+    1775,
+    943
+   ],
+   "contents": "発達障…って実",
+   "direction": "vertical",
+   "order": 4,
+   "role": null
+  },
+  {
+   "box": [
+    524,
+    387,
+    1325,
+    421
+   ],
+   "contents": "●優先…になる",
+   "direction": "horizontal",
+   "order": 5,
+   "role": null
+  },
+  {
+   "box": [
+    522,
+    421,
+    1322,
+    474
+   ],
+   "contents": "・関心…やすい",
+   "direction": "horizontal",
+   "order": 6,
+   "role": null
+  },
+  {
+   "box": [
+    525,
+    481,
+    1225,
+    507
+   ],
+   "contents": "●時間…難しい",
+   "direction": "horizontal",
+   "order": 7,
+   "role": null
+  },
+  {
+   "box": [
+    525,
+    542,
+    584,
+    569
+   ],
+   "contents": "特徴",
+   "direction": "horizontal",
+   "order": 8,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    520,
+    581,
+    1332,
+    637
+   ],
+   "contents": "自閉症…ます。",
+   "direction": "horizontal",
+   "order": 9,
+   "role": null
+  },
+  {
+   "box": [
+    223,
+    547,
+    462,
+    616
+   ],
+   "contents": "ASD…ム症)",
+   "direction": "horizontal",
+   "order": 10,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    522,
+    676,
+    586,
+    707
+   ],
+   "contents": "特性",
+   "direction": "horizontal",
+   "order": 11,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    525,
+    717,
+    1187,
+    743
+   ],
+   "contents": "●刺激…やすい",
+   "direction": "horizontal",
+   "order": 12,
+   "role": null
+  },
+  {
+   "box": [
+    526,
+    747,
+    1256,
+    773
+   ],
+   "contents": "●聴覚…りする",
+   "direction": "horizontal",
+   "order": 13,
+   "role": null
+  },
+  {
+   "box": [
+    526,
+    778,
+    1302,
+    833
+   ],
+   "contents": "・気分…起こす",
+   "direction": "horizontal",
+   "order": 14,
+   "role": null
+  },
+  {
+   "box": [
+    526,
+    837,
+    1278,
+    863
+   ],
+   "contents": "・好き…やすい",
+   "direction": "horizontal",
+   "order": 15,
+   "role": null
+  },
+  {
+   "box": [
+    527,
+    868,
+    1331,
+    923
+   ],
+   "contents": "•自分…がある",
+   "direction": "horizontal",
+   "order": 16,
+   "role": null
+  },
+  {
+   "box": [
+    1910,
+    231,
+    2417,
+    310
+   ],
+   "contents": "発達障…の種類",
+   "direction": "horizontal",
+   "order": 18,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    518,
+    226,
+    1331,
+    282
+   ],
+   "contents": "不注意…です。",
+   "direction": "horizontal",
+   "order": 19,
+   "role": null
+  },
+  {
+   "box": [
+    2566,
+    1014,
+    2719,
+    1560
+   ],
+   "contents": "際に障…せん。",
+   "direction": "vertical",
+   "order": 20,
+   "role": null
+  },
+  {
+   "box": [
+    2154,
+    1014,
+    2545,
+    1560
+   ],
+   "contents": "発達障…ます。",
+   "direction": "vertical",
+   "order": 21,
+   "role": null
+  },
+  {
+   "box": [
+    1680,
+    1015,
+    2131,
+    1560
+   ],
+   "contents": "それぞ…ます。",
+   "direction": "vertical",
+   "order": 22,
+   "role": null
+  },
+  {
+   "box": [
+    519,
+    998,
+    1333,
+    1056
+   ],
+   "contents": "知的な…です。",
+   "direction": "horizontal",
+   "order": 23,
+   "role": null
+  },
+  {
+   "box": [
+    521,
+    1093,
+    585,
+    1123
+   ],
+   "contents": "特性",
+   "direction": "horizontal",
+   "order": 24,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    525,
+    1134,
+    1335,
+    1191
+   ],
+   "contents": "●計算…が多い",
+   "direction": "horizontal",
+   "order": 25,
+   "role": null
+  },
+  {
+   "box": [
+    526,
+    1194,
+    1232,
+    1221
+   ],
+   "contents": "●書類…たまる",
+   "direction": "horizontal",
+   "order": 26,
+   "role": null
+  },
+  {
+   "box": [
+    525,
+    1224,
+    1333,
+    1279
+   ],
+   "contents": "•幼い…やすい",
+   "direction": "horizontal",
+   "order": 27,
+   "role": null
+  },
+  {
+   "box": [
+    524,
+    1318,
+    582,
+    1346
+   ],
+   "contents": "特徴",
+   "direction": "horizontal",
+   "order": 29,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    519,
+    1357,
+    1333,
+    1414
+   ],
+   "contents": "筋力や…です。",
+   "direction": "horizontal",
+   "order": 30,
+   "role": null
+  },
+  {
+   "box": [
+    224,
+    1324,
+    438,
+    1393
+   ],
+   "contents": "DCD…動症)",
+   "direction": "horizontal",
+   "order": 31,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    522,
+    1453,
+    583,
+    1482
+   ],
+   "contents": "特性",
+   "direction": "horizontal",
+   "order": 32,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    526,
+    1493,
+    1333,
+    1548
+   ],
+   "contents": "•自分…らない",
+   "direction": "horizontal",
+   "order": 33,
+   "role": null
+  },
+  {
+   "box": [
+    2747,
+    1647,
+    2806,
+    1680
+   ],
+   "contents": "014",
+   "direction": "horizontal",
+   "order": 34,
+   "role": null
+  },
+  {
+   "box": [
+    525,
+    1644,
+    1131,
+    1670
+   ],
+   "contents": "●手先…しまう",
+   "direction": "horizontal",
+   "order": 35,
+   "role": null
+  },
+  {
+   "box": [
+    522,
+    357,
+    1332,
+    391
+   ],
+   "contents": "●衝動…やすい",
+   "direction": "horizontal",
+   "order": 36,
+   "role": null
+  },
+  {
+   "box": [
+    523,
+    185,
+    583,
+    215
+   ],
+   "contents": "特徴",
+   "direction": "horizontal",
+   "order": 37,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    223,
+    191,
+    486,
+    262
+   ],
+   "contents": "ADH…障害)",
+   "direction": "horizontal",
+   "order": 38,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    521,
+    320,
+    586,
+    351
+   ],
+   "contents": "特性",
+   "direction": "horizontal",
+   "order": 39,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    524,
+    959,
+    582,
+    986
+   ],
+   "contents": "特徴",
+   "direction": "horizontal",
+   "order": 41,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    223,
+    965,
+    414,
+    1034
+   ],
+   "contents": "SLD…障害)",
+   "direction": "horizontal",
+   "order": 42,
+   "role": "section_headings"
+  },
+  {
+   "box": [
+    524,
+    1554,
+    1160,
+    1580
+   ],
+   "contents": "•しょ…えない",
+   "direction": "horizontal",
+   "order": 43,
+   "role": null
+  },
+  {
+   "box": [
+    526,
+    1583,
+    1021,
+    1609
+   ],
+   "contents": "·姿勢…疲れる",
+   "direction": "horizontal",
+   "order": 44,
+   "role": null
+  },
+  {
+   "box": [
+    526,
+    1613,
+    1007,
+    1640
+   ],
+   "contents": "・肩こ…される",
+   "direction": "horizontal",
+   "order": 45,
+   "role": null
+  }
+ ],
+ "tables": [],
+ "figures": [
+  {
+   "box": [
+    254,
+    663,
+    446,
+    903
+   ],
+   "order": 17,
+   "direction": "horizontal",
+   "paragraphs": []
+  },
+  {
+   "box": [
+    253,
+    1056,
+    447,
+    1292
+   ],
+   "order": 28,
+   "direction": "horizontal",
+   "paragraphs": [
+    {
+     "box": [
+      421,
+      1055,
+      443,
+      1092
+     ],
+     "contents": "3",
+     "direction": "horizontal",
+     "order": 0,
+     "role": null
+    },
+    {
+     "box": [
+      371,
+      1204,
+      397,
+      1237
+     ],
+     "contents": "号",
+     "direction": "horizontal",
+     "order": 1,
+     "role": null
+    }
+   ]
+  },
+  {
+   "box": [
+    245,
+    307,
+    463,
+    490
+   ],
+   "order": 40,
+   "direction": "horizontal",
+   "paragraphs": []
+  },
+  {
+   "box": [
+    232,
+    1420,
+    478,
+    1662
+   ],
+   "order": 46,
+   "direction": "horizontal",
+   "paragraphs": []
+  }
+ ],
+ "words": [
+  {
+   "points": [
+    [
+     0,
+     0
+    ],
+    [
+     2806,
+     0
+    ],
+    [
+     2806,
+     1680
+    ],
+    [
+     0,
+     1680
+    ]
+   ]
+  }
+ ]
+}

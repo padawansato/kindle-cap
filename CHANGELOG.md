@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `book-ocr --page-order auto|rtl|ltr|off`（既定 `auto`）：見開きキャプチャで、片方のページを全部読んでからもう片方へ進むように markdown の段落順を直し、縦書きが上下 2 段に組まれたページで上段末尾（句点なし）と下段先頭（字下げなし）に割れた段落を連結するようにした。yomitoku の `--reading_order` は画像全体を上下の帯で読むため「右上段 → 左ページ → 右下段」の順になり文が途中で切れていた（`docs/ocr-bench/2026-10-11-reading-order.md`）。右ページ先か左ページ先かは半面ごとの縦書き比率で自動判定（縦書きの本は右先）。`pages/page_NNN.json` は変更せず、md レンダの直前にメモリ上で適用する。既存の md を作り直すには `--skip-existing` を外して再実行（再 OCR）が必要。従来の順にしたい場合は `--page-order off`。`index.json` の `ocr_settings` に `page_order` を記録する（issue #95）
+
 ## [0.11.0] - 2026-10-11
 
 ### Changed
