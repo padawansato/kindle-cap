@@ -113,6 +113,12 @@ ignore_missing_imports = true
 module = ["ebooklib", "ebooklib.*", "markdown", "markdown.*"]
 ignore_missing_imports = true
 
+# pymupdf は py.typed を同梱するが関数に型注釈が無い (1.28 時点)。
+# 呼び出し側だけ untyped call を許容する
+[[tool.mypy.overrides]]
+module = ["book_ocr.exporters.searchable_pdf"]
+disallow_untyped_calls = false
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

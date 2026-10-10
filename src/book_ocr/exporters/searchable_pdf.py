@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import errno
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -58,7 +58,7 @@ class OverlayResult:
 # ---------------------------------------------------------------------------
 
 
-def _bbox(points: Iterable[Iterable[float]]) -> tuple[float, float, float, float]:
+def _bbox(points: Iterable[Sequence[float]]) -> tuple[float, float, float, float]:
     pts = [(float(p[0]), float(p[1])) for p in points]
     xs = [x for x, _ in pts]
     ys = [y for _, y in pts]
