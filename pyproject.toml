@@ -113,7 +113,7 @@ module = ["tqdm", "tqdm.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["ApplicationServices", "Quartz", "objc"]
+module = ["ApplicationServices", "Quartz", "objc", "Foundation"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

@@ -8,6 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from time import sleep
 
+from .background import capture_kindle_window, post_next_page
 from .capture import capture_rect, crop_top
 from .config import CaptureConfig, Geometry
 from .keys import send_next_page
@@ -21,6 +22,46 @@ logger = logging.getLogger(__name__)
 def _window_geometry(config: CaptureConfig) -> Geometry:
     """Kindle ウィンドウ frame を取り、config.crop_top ぶん上端を削って返す (issue #69)."""
     return crop_top(get_window_geometry(), config.crop_top)
+
+
+_OFFSCREEN_POLL_SEC = 2.0
+
+
+def _capture_background(config: CaptureConfig, png_path: Path) -> None:
+    """窓 ID 指定で撮る。窓が offscreen (hide / minimize / 別 Space) の間は失敗にせず待つ."""
+    warned = False
+    while not capture_kindle_window(png_path, crop_top=config.crop_top):
+        if not warned:
+            logger.warning(
+                "Kindle の窓が画面上にありません (隠した / 最小化した / 別のデスクトップ)。"
+                "表示されるまで待ちます"
+            )
+            warned = True
+        sleep(_OFFSCREEN_POLL_SEC)
+    if warned:
+        logger.info("Kindle の窓が戻ったので再開します")
+
+
+def _capture_page(
+    config: CaptureConfig, png_path: Path, before_capture: Callable[[], None] | None
+) -> None:
+    if config.background:
+        if before_capture is not None:
+            before_capture()
+        _capture_background(config, png_path)
+        return
+    activate_kindle()
+    if before_capture is not None:
+        before_capture()
+    capture_rect(_window_geometry(config), png_path)
+
+
+def _next_page(config: CaptureConfig) -> None:
+    assert config.direction is not None
+    if config.background:
+        post_next_page(config.direction)
+    else:
+        send_next_page(config.direction)
 
 
 def run(
@@ -40,6 +81,12 @@ def run(
         _run_dry(config)
         return
 
+    if config.background:
+        # 開始時に 1 回だけ前面に出す (hide されていれば解除される)。以後は奪わない。
+        # activate 直後の再描画中に撮らないよう wait ぶん落ち着かせる
+        activate_kindle()
+        sleep(config.wait)
+
     if auto_direction:
         out_dir = config.out / config.name
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -48,9 +95,13 @@ def run(
         resolved_direction, initial_pngs = detect_direction(
             out_dir=out_dir,
             geom_provider=lambda: _window_geometry(config),
-            activator=activate_kindle,
-            capturer=capture_rect,
-            sender=send_next_page,
+            activator=(lambda: None) if config.background else activate_kindle,
+            capturer=(
+                (lambda _geom, path: _capture_background(config, path))
+                if config.background
+                else capture_rect
+            ),
+            sender=post_next_page if config.background else send_next_page,
             sleeper=sleep,
             wait=config.wait,
         )
@@ -109,17 +160,13 @@ def _capture_book(
             # 試写流用時の最初の反復は、試写ループ末尾で矢印を送っていないため
             # 先にページを進めてから撮影する
             if i == start_index and start_index > 1:
-                send_next_page(config.direction)
+                _next_page(config)
                 sleep(config.wait)
 
             logger.info("[%d/%d] capturing page", i, config.pages)
+            png_path = out_dir / f"page_{i:03d}.png"
             try:
-                activate_kindle()
-                if before_capture is not None:
-                    before_capture()
-                geom = _window_geometry(config)
-                png_path = out_dir / f"page_{i:03d}.png"
-                capture_rect(geom, png_path)
+                _capture_page(config, png_path, before_capture)
             except Exception:
                 logger.exception(
                     "page %d/%d capture failed (captured so far: %d, out_dir=%s)",
@@ -141,7 +188,7 @@ def _capture_book(
 
             captured.append(png_path)
             if i < config.pages:
-                send_next_page(config.direction)
+                _next_page(config)
                 sleep(config.wait)
     except KeyboardInterrupt:
         logger.warning(
@@ -180,9 +227,13 @@ def _capture_book(
 
 
 def _run_dry(config: CaptureConfig) -> None:
+    dry_path = config.out / "dry_run.png"
+    if config.background:
+        _capture_background(config, dry_path)
+        logger.info("saved: %s", dry_path)
+        return
     activate_kindle()
     geom = _window_geometry(config)
-    dry_path = config.out / "dry_run.png"
     capture_rect(geom, dry_path)
     logger.info("window geometry: x=%d y=%d w=%d h=%d", geom.x, geom.y, geom.width, geom.height)
     logger.info("saved: %s", dry_path)

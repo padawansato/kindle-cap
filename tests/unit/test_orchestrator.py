@@ -21,6 +21,7 @@ def _config(tmp_path: Path, **overrides: Any) -> CaptureConfig:
         wait=0.0,
         out=tmp_path,
         keep_png=True,
+        background=False,  # 既存テストは前面撮影の経路を見る。background は専用テストで
     )
     base.update(overrides)
     return CaptureConfig(**base)
@@ -1003,3 +1004,79 @@ def test_run_warns_when_ceiling_reached_without_detecting_end(
     with caplog.at_level(logging.WARNING, logger="kindle_cap"):
         run(_config(tmp_path, pages=5), auto_stop=True)
     assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+# ---------------------------------------------------------------------------
+# background モード (issue #84): フォーカスを奪わず、窓 ID 指定で撮る
+# ---------------------------------------------------------------------------
+
+
+@patch("kindle_cap.orchestrator.sleep")
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.post_next_page")
+@patch("kindle_cap.orchestrator.capture_kindle_window")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_background_never_activates_per_page_and_waits_while_offscreen(
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_capwin: MagicMock,
+    mock_post: MagicMock,
+    mock_pdf: MagicMock,
+    mock_sleep: MagicMock,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """background では activate は開始時の 1 回だけ、撮影は窓 ID 指定、キーは pid 宛て。
+    窓が offscreen (hide / 別 Space) の間は失敗せず待ち、戻ったら続きから撮る"""
+    mock_geom.return_value = _GEOM
+    calls = {"n": 0}
+
+    def _capture(path: Path, *, crop_top: int) -> bool:
+        calls["n"] += 1
+        if calls["n"] in (2, 3):  # 2 ページ目を撮ろうとした時に 2 回 offscreen
+            return False
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(f"page-{calls['n']}".encode())
+        return True
+
+    mock_capwin.side_effect = _capture
+    with caplog.at_level(logging.WARNING, logger="kindle_cap"):
+        run(_config(tmp_path, pages=3, background=True, crop_top=28), auto_stop=False)
+
+    assert mock_act.call_count == 1  # 毎ページの activate をしない
+    mock_cap.assert_not_called()
+    mock_send.assert_not_called()
+    assert mock_post.call_count == 2
+    assert mock_post.call_args.args[0] is Direction.RTL
+    assert all(c.kwargs == {"crop_top": 28} for c in mock_capwin.call_args_list)
+    assert len(mock_pdf.call_args[0][0]) == 3
+    offscreen_warnings = [r for r in caplog.records if "画面上にありません" in r.getMessage()]
+    assert len(offscreen_warnings) == 1  # 待っている間、毎回は騒がない
+    assert mock_sleep.call_count >= 2  # offscreen 待ちの sleep
+
+
+@patch("kindle_cap.orchestrator.post_next_page")
+@patch("kindle_cap.orchestrator.capture_kindle_window")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_background_dry_run_captures_window_without_activate(
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_capwin: MagicMock,
+    mock_post: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_capwin.return_value = True
+    run(_config(tmp_path, background=True), dry_run=True)
+    mock_act.assert_not_called()
+    mock_capwin.assert_called_once_with(tmp_path / "dry_run.png", crop_top=0)
+    mock_post.assert_not_called()
