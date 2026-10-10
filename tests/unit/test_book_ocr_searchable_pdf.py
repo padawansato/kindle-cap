@@ -119,7 +119,7 @@ def test_overlay_makes_every_word_copyable(
     tmp_path: Path, image_pdf: Path, page_json: Path
 ) -> None:
     out = tmp_path / "book.searchable.pdf"
-    result = overlay_text_layer(image_pdf, out, {2: page_json})
+    result = overlay_text_layer(image_pdf, out, {2: (page_json, tmp_path / "page_002.png")})
     assert (result.pages_written, result.words_written) == (1, 10)
 
     doc = pymupdf.open(out)
@@ -143,7 +143,7 @@ def test_overlay_places_words_on_their_boxes(
     """抽出した語の矩形が JSON の bbox (px→pt) に重なる。ずれると選択範囲が本文からずれる。
     同じ行で隣接する語は抽出時に 1 語に連結されるので、部分文字列で引く。"""
     out = tmp_path / "book.searchable.pdf"
-    overlay_text_layer(image_pdf, out, {2: page_json})
+    overlay_text_layer(image_pdf, out, {2: (page_json, tmp_path / "page_002.png")})
     page = pymupdf.open(out)[1]
     scale = page.rect.width / PNG_W
     got = [(w[4], pymupdf.Rect(w[:4])) for w in page.get_text("words")]
@@ -160,8 +160,11 @@ def test_overlay_rejects_pages_beyond_pdf_before_writing(
     tmp_path: Path, image_pdf: Path, page_json: Path
 ) -> None:
     out = tmp_path / "book.searchable.pdf"
+    png = tmp_path / "page_002.png"
     with pytest.raises(SearchablePdfError, match=r"\[4, 9\]"):
-        overlay_text_layer(image_pdf, out, {2: page_json, 4: page_json, 9: page_json})
+        overlay_text_layer(
+            image_pdf, out, {2: (page_json, png), 4: (page_json, png), 9: (page_json, png)}
+        )
     assert not out.exists()
 
 
@@ -178,5 +181,5 @@ def test_overlay_removes_partial_output_on_enospc(
         patch("pymupdf.Document.save", boom),
         pytest.raises(SearchablePdfError, match="ディスク容量"),
     ):
-        overlay_text_layer(image_pdf, out, {2: page_json})
+        overlay_text_layer(image_pdf, out, {2: (page_json, tmp_path / "page_002.png")})
     assert not out.exists()

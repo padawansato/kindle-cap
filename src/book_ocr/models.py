@@ -36,6 +36,8 @@ class BookMetadata:
     ocr_engine_version: str | None = None
     ocr_settings: dict[str, Any] | None = field(default=None)
     ocr_runtime: dict[str, Any] | None = field(default=None)
+    # issue #70: 生成した searchable PDF のファイル名 (out_dir 相対)。未生成なら None
+    searchable_pdf: str | None = None
 
     def __post_init__(self) -> None:
         if not self.title:

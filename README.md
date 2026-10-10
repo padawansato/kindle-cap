@@ -155,8 +155,27 @@ output/my-book/
   my-book.md                      # 新規。全文連結（<!-- page:NNN --> 区切り）— grep 一発用
   pages/
     page_001.md ...               # 新規。ページ単位 Markdown
+    page_001.json ...             # 新規。OCR の生 JSON（文字座標つき）
+  my-book.searchable.pdf          # --searchable-pdf 指定時。文字をコピー・検索できる PDF
 output/my-book.pdf                # 既存。視覚確認用
 ```
+
+#### コピー・検索できる PDF を作る（`--searchable-pdf`）
+
+`output/my-book.pdf` は画像だけの PDF なので文字を選択できない。`--searchable-pdf` を付けると、OCR の生 JSON（`pages/page_NNN.json`）の文字座標を使って `output/my-book.pdf` に不可視のテキスト層を重ね、`output/my-book/my-book.searchable.pdf` を作る（issue #70）。画像は再エンコードしないので、サイズは元 PDF + 数十 KB、所要時間は 1000 ページでも数十秒。
+
+```bash
+# OCR と同時に作る
+uv run book-ocr output/my-book/ --searchable-pdf
+
+# OCR 済み（JSON あり）なら再 OCR なしで PDF だけ作る
+uv run book-ocr output/my-book/ --skip-existing --searchable-pdf
+```
+
+- yomitoku 標準の searchable PDF は使わず自前で描く。標準実装は語の 15〜20% を落とし、縦書きを全角化（「6時半」→「６時半」）して 1 文字ずつ描くため、検索・コピーで実用にならなかった
+- 縦書きも語単位で 1 オブジェクトとして描くので、ドラッグ選択・コピーで分断されない
+- v0.5.0 より前に OCR したページは JSON が無いためテキスト層が付かない。該当ページ番号を警告に列挙するので、必要なら `--skip-existing` を外して再 OCR する
+- `output/my-book.pdf` が無い場合は PNG から画像 PDF を組む。別の PDF を元にしたいときは `--source-pdf PATH`
 
 #### book-ocr のオプション
 
@@ -175,6 +194,8 @@ output/my-book.pdf                # 既存。視覚確認用
 | `--skip-existing` | off | 既存 `pages/page_NNN.md` があるページは OCR をスキップ (issue #41)。失敗後の再走を高速化 |
 | `--ignore-disk-check` | off | 起動時のディスク容量 preflight をバイパス (issue #48)。デフォルトは入力 PNG × 1.5 マージンで out_dir / tempdir 残量を確認し、不足なら exit 1 |
 | `--figure / --no-figure` | `--figure` | ページ内の図表を画像として `figures/` に切り出し、`pages/page_NNN.md` に `<img>` 参照として埋め込む |
+| `--searchable-pdf` | off | OCR JSON から文字をコピー・検索できる `<title>.searchable.pdf` を作る (issue #70)。`--skip-existing` と併用で再 OCR なしに PDF だけ作り直せる |
+| `--source-pdf PATH` | `<book_dir の親>/<book_dir 名>.pdf` | `--searchable-pdf` の元になる画像 PDF。無ければ PNG から組む |
 
 #### 性能の目安（Apple Silicon MPS）
 

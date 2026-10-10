@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 import pymupdf
+from PIL import Image
 
 # kindle-cap の PNG は 96 dpi 相当で PDF に載る (2940px → 2205pt)。
 # build_image_pdf でも同じ縮尺にして、overlay 側の px→pt 変換を共通にする。
@@ -135,24 +136,21 @@ def _load_words(json_path: Path) -> list[Word]:
     return order_words(json.loads(json_path.read_text(encoding="utf-8")))
 
 
-def _image_size_px(page: pymupdf.Page) -> tuple[int, int]:
-    """ページに載っている (最初の) 画像のピクセルサイズ。px→pt の縮尺に使う."""
-    images = page.get_images()
-    if not images:
-        raise SearchablePdfError(
-            f"ページ {page.number + 1} に画像がありません (画像 PDF ではない?)"
-        )
-    _xref, _smask, width, height, *_ = images[0]
-    return int(width), int(height)
+def _png_size_px(png_path: Path) -> tuple[int, int]:
+    """OCR にかけた PNG のピクセルサイズ (ヘッダだけ読む)。JSON の座標系はこれ."""
+    with Image.open(png_path) as img:
+        return int(img.width), int(img.height)
 
 
-def _draw_words(page: pymupdf.Page, words: list[Word], font: pymupdf.Font) -> None:
+def _draw_words(page: pymupdf.Page, words: list[Word], png_path: Path, font: pymupdf.Font) -> None:
     """語ごとに矩形へ不可視テキストを描く.
 
+    縮尺は PDF ページ寸法 ÷ OCR した PNG のピクセル寸法。PDF 側の画像が JPEG 再圧縮や
+    縮小で別解像度になっていても、JSON の座標は PNG 基準なので正しく乗る。
     横書き: 語の幅にフォントサイズを合わせ、基線は下端 + descender。
     縦書き: 列の上端を起点に横書きで組んでから、起点まわりに 90° 回して
     上→下に流す (1 語 = 1 テキストオブジェクトなので抽出時に分断されない)。"""
-    img_w, img_h = _image_size_px(page)
+    img_w, img_h = _png_size_px(png_path)
     sx = page.rect.width / img_w
     sy = page.rect.height / img_h
     for w in words:
@@ -195,14 +193,15 @@ def _save(doc: pymupdf.Document, out_path: Path) -> None:
 
 
 def overlay_text_layer(
-    pdf_in: Path, out_path: Path, page_jsons: Mapping[int, Path]
+    pdf_in: Path, out_path: Path, pages: Mapping[int, tuple[Path, Path]]
 ) -> OverlayResult:
-    """`pdf_in` の各ページに `page_jsons[page_number]` の語を不可視描画して `out_path` に書く.
+    """`pdf_in` の各ページに語を不可視描画して `out_path` に書く.
 
-    `page_jsons` に無いページはそのまま (テキスト層なし)。PDF のページ数を超える
-    ページ番号があれば、何も書かずに SearchablePdfError で列挙する。"""
+    `pages` は page_number → (OCR JSON, OCR にかけた PNG)。無いページはそのまま
+    (テキスト層なし)。PDF のページ数を超えるページ番号があれば、何も書かずに
+    SearchablePdfError で列挙する。"""
     # JSON は PDF を開く前に全部読む (読めなければ部分出力を作らずに落ちる)
-    words_by_page = {n: _load_words(path) for n, path in sorted(page_jsons.items())}
+    words_by_page = {n: (_load_words(j), png) for n, (j, png) in sorted(pages.items())}
     doc = pymupdf.open(pdf_in)
     try:
         beyond = [n for n in words_by_page if not 1 <= n <= len(doc)]
@@ -213,10 +212,10 @@ def overlay_text_layer(
         font = pymupdf.Font(_FONT_NAME)
         pages_written = 0
         words_written = 0
-        for n, words in words_by_page.items():
+        for n, (words, png) in words_by_page.items():
             if not words:
                 continue
-            _draw_words(doc[n - 1], words, font)
+            _draw_words(doc[n - 1], words, png, font)
             pages_written += 1
             words_written += len(words)
         _save(doc, out_path)
