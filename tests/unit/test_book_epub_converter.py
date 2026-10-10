@@ -89,3 +89,24 @@ class TestExtractHeadings:
     def test_heading_that_becomes_empty_after_tag_removal_is_excluded(self) -> None:
         md = "# <br>\n本文\n## 節\n"
         assert extract_headings(md) == [Heading(2, "節")]
+
+
+class TestDropSingleCharParagraphs:
+    """issue #68: 縦書きの装飾見出し「解決法」が「決」「法」の 1 文字段落になる"""
+
+    def test_single_char_paragraphs_are_dropped_but_real_text_kept(self) -> None:
+        from book_epub.converter import md_to_xhtml_body
+
+        md = "眠れなくなることも少なくありません。\n\n決\n\n法\n\n# 質のいい睡眠を取る\n\n解 \n\n寝室を再考する。\n\n●\n"
+        html = md_to_xhtml_body(md)
+        assert "<p>決</p>" not in html and "<p>法</p>" not in html and "<p>解</p>" not in html
+        assert "<p>●</p>" not in html  # 記号 1 文字も同様
+        assert "少なくありません" in html and "寝室を再考する" in html
+        assert "<h1>質のいい睡眠を取る</h1>" in html  # 見出しは対象外
+
+    def test_single_char_line_inside_a_paragraph_is_not_touched(self) -> None:
+        from book_epub.converter import md_to_xhtml_body
+
+        # 空行で区切られていない行は段落の一部なので落とさない
+        html = md_to_xhtml_body("一\n二\n三")
+        assert "一" in html and "二" in html and "三" in html

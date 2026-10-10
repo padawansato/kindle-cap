@@ -12,6 +12,9 @@ _FIGURE_IMG_RE = re.compile(r'<img\b([^>]*?)src="(?:\.\./)?figures/([^"]+)"([^>]
 _HEADING_RE = re.compile(r"^(#{1,3})\s+(.+?)\s*$", re.MULTILINE)
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _BR_TAG_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
+# 空行で囲まれた「1 文字だけの段落」。縦書きの装飾見出し (「解決法」) が yomitoku で
+# 1 文字ずつの段落に割れたもの (issue #68)。本文で 1 文字だけの段落は正当には出ない
+_SINGLE_CHAR_PARAGRAPH_RE = re.compile(r"(?:(?<=\n\n)|^)[^\s#<|\-*>][ \t]*\n(?=\n|$)", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -38,13 +41,19 @@ def _strip_forced_linebreaks(text: str) -> str:
     return _BR_TAG_RE.sub(_repl, text)
 
 
+def _drop_single_char_paragraphs(text: str) -> str:
+    """1 文字だけの段落を落とす (issue #68)。見出し・HTML・表・リスト行は対象外。"""
+    return _SINGLE_CHAR_PARAGRAPH_RE.sub("", text)
+
+
 def md_to_xhtml_body(markdown_text: str) -> str:
     """Markdown を HTML 本文（body 内側）に変換する。表の html は素通し。
 
     yomitoku 由来の行折り返し `<br>`（原本のレイアウト都合の強制改行）は
-    リフロー表示を破綻させるため、変換前に除去する。
+    リフロー表示を破綻させるため、変換前に除去する。装飾見出しが割れてできた
+    1 文字だけの段落も落とす (issue #68)。
     """
-    text = _strip_forced_linebreaks(markdown_text)
+    text = _drop_single_char_paragraphs(_strip_forced_linebreaks(markdown_text))
     return str(md_lib.markdown(text, extensions=["tables"]))
 
 
