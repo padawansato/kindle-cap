@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-10-11
+
 ### Fixed
 
 - `book-epub --join-pages`：ページ末尾のブロックが 2 行以上に折り返された本文段落（読点を含むか 30 文字以上）のときだけ次ページと結合するようにした。実書籍 93 ページで結合候補 18 組を正解付けしたところ、正しい結合は 5 組（精度 28%）で、誤結合の A 側はほぼ 1 行の小見出し・図キャプションだった。この条件で精度 57%（目次ページを `--skip-pages` で外せば 67%）、再現率 80%。誤結合の害は段落の間が 1 つ消えるだけなので、この水準で既定 on を維持する
@@ -210,7 +212,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/padawansato/kindle-cap/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/padawansato/kindle-cap/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/padawansato/kindle-cap/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/padawansato/kindle-cap/compare/v0.13.0...v0.13.1
