@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-11
+
 ### Fixed
 
 - 本を開いた直後に出る読書位置の同期シート（「最新の位置に移動」「位置Nに戻る」）がページ画像の下部に写り込んでいた。シートのハンドルは「閉じる」と名乗るが AXPress では消えず、Kindle の pid 宛てに Escape を送ると消えるので `dismiss_sheet` にその経路を追加した。`kindle-cap`（単体）にも各ページ撮影直前にシートを閉じる hook を入れた（これまでは `kindle-cap-all` だけが見ていた）。アクセシビリティ権限が無い場合は一度だけ警告して撮影は続ける（issue #86）
@@ -152,7 +154,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/padawansato/kindle-cap/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/padawansato/kindle-cap/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/padawansato/kindle-cap/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/padawansato/kindle-cap/compare/v0.6.1...v0.7.0
