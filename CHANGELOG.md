@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-11
+
 ### Fixed
 
 - `kindle-cap-all`：背面撮影（v0.9.0）中にユーザーが別のアプリを前面にしていると、次の本を開く・閉じる操作の AXPress が「開く」ではなくライブラリの選択モードになり `リーダーが開きません` で失敗していた。書籍ボタンを押す直前と本を閉じる直前に Kindle を前面に出し、選択モードになっていれば「キャンセル」で戻すようにした（issue #84）
@@ -162,7 +164,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/padawansato/kindle-cap/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/padawansato/kindle-cap/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/padawansato/kindle-cap/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/padawansato/kindle-cap/compare/v0.7.0...v0.8.0
