@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 SKIP_EXISTING = "既存 PDF あり"
 SKIP_SAMPLE = "サンプル"  # 書籍情報シートが割り込むなど挙動が違うので常に対象外
 SKIP_PDF = "PDF"
-SKIP_SERIES = "シリーズ (巻一覧)"
+SKIP_SERIES = "シリーズ (巻一覧)"  # 漫画などのシリーズは方針として対象外 (対応予定なし)
 
 
 @dataclass(frozen=True)
@@ -52,7 +52,7 @@ def select_books(
         elif book.is_pdf and not include_pdf:
             reason = SKIP_PDF
         elif book.is_series:
-            reason = SKIP_SERIES  # 巻一覧が開くだけで本は開かない (未対応)
+            reason = SKIP_SERIES
         selected.append((book, name, reason))
     return selected
 
