@@ -162,7 +162,7 @@ output/my-book.pdf                # 既存。視覚確認用
 
 #### コピー・検索できる PDF を作る（`--searchable-pdf`）
 
-`output/my-book.pdf` は画像だけの PDF なので文字を選択できない。`--searchable-pdf` を付けると、OCR の生 JSON（`pages/page_NNN.json`）の文字座標を使って `output/my-book.pdf` に不可視のテキスト層を重ね、`output/my-book/my-book.searchable.pdf` を作る（issue #70）。画像は再エンコードしないので、サイズは元 PDF + 数十 KB、所要時間は 1000 ページでも数十秒。
+`output/my-book.pdf` は画像だけの PDF なので文字を選択できない。`--searchable-pdf` を付けると、OCR の生 JSON（`pages/page_NNN.json`）の文字座標を使って `output/my-book.pdf` に不可視のテキスト層を重ね、`output/my-book/my-book.searchable.pdf` を作る（issue #70）。画像は再エンコードしないので、サイズは元 PDF + 数 MB、所要時間は 1000 ページで約 1 分（実測 68 秒、メモリ 100MB）。
 
 ```bash
 # OCR と同時に作る
