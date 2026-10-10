@@ -20,7 +20,7 @@ from . import ax
 
 logger = logging.getLogger(__name__)
 
-# "巻" はシリーズ (複数巻をまとめた 1 ボタン)。押すと巻一覧が開くので本としては扱えない
+# "巻" はシリーズ (複数巻をまとめた 1 ボタン)。漫画などが該当し、方針として対象外
 _KNOWN_TAGS = frozenset(
     {"既読", "NEW", "PDF", "サンプル", "巻", "Prime Reading", "Kindle Unlimited"}
 )
