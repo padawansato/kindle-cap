@@ -20,6 +20,7 @@ manifest:
 
     {"export_figure": bool,
      "figure_dir_name": "figures",
+     "page_order": "auto" | "rtl" | "ltr" | "off",   # 省略時 off (issue #95)
      "pages": [{"n": int, "json": "...", "png": "...", "out_path": "..."}]}
 
 stdout (成功時):
@@ -55,9 +56,21 @@ def drop_script_dir_from_sys_path() -> None:
     sys.path[:] = [p for p in sys.path if p and str(Path(p).resolve()) != here]
 
 
+def ensure_book_ocr_importable() -> None:
+    """`book_ocr.reading_order` を import できるよう `src/` を sys.path に足す。
+
+    隔離 venv の python で起動される場合、その venv に book_ocr は入っていない。
+    reading_order は純 Python で依存が無いので、このファイルの位置から src/ を
+    逆算して足せば十分 (issue #95)。"""
+    src = str(Path(__file__).resolve().parents[2])
+    if src not in sys.path:
+        sys.path.append(src)
+
+
 def render(manifest: dict[str, Any]) -> dict[str, Any]:
     """manifest の各ページを markdown 化して返す (figure 画像は副作用で書かれる)."""
     drop_script_dir_from_sys_path()
+    ensure_book_ocr_importable()
 
     # yomitoku の import はこの関数の中だけ。モジュール top-level に置くと
     # 本 worker を import しただけで torch が引かれる。
@@ -65,12 +78,17 @@ def render(manifest: dict[str, Any]) -> dict[str, Any]:
     from yomitoku.export.export_markdown import convert_markdown
     from yomitoku.schemas import DocumentAnalyzerSchema
 
+    from book_ocr.reading_order import fix_reading_order
+
     export_figure = manifest["export_figure"]
     figure_dir_name = manifest["figure_dir_name"]
+    page_order = manifest.get("page_order", "off")
 
     rendered: list[dict[str, Any]] = []
     for page in manifest["pages"]:
         raw = json.loads(Path(page["json"]).read_text(encoding="utf-8"))
+        # 見開きのページ順と縦書き 2 段組の連結 (issue #95)。JSON ファイルは変えない
+        raw = fix_reading_order(raw, page_order=page_order)
         schema = DocumentAnalyzerSchema(**raw)
 
         # figure を切り出すときだけ画像が要る。yomitoku CLI と同じ load_image を

@@ -45,6 +45,7 @@ def run_ocr_pipeline(
     figure: bool = True,
     searchable_pdf: bool = False,
     source_pdf: Path | None = None,
+    page_order: str = "auto",
 ) -> Path:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を出力する.
 
@@ -101,6 +102,7 @@ def run_ocr_pipeline(
         # OCR の生 JSON は md と並べて pages/ に置く (issue #70)。searchable PDF は
         # ここから作るので、再 OCR なしで PDF だけ作り直せる。
         json_out_dir=out_dir / "pages",
+        page_order=page_order,
     )
     captured_at = datetime.now(UTC)
 
@@ -180,6 +182,15 @@ def ocr(
         True,
         "--ignore-meta/--no-ignore-meta",
         help="ヘッダー/フッター (Kindle メタ) を除外する",
+    ),
+    page_order: str = typer.Option(
+        "auto",
+        "--page-order",
+        help=(
+            "見開きキャプチャのページ順 (auto/rtl/ltr/off、issue #95)。auto は縦書きが"
+            "多ければ右ページ先。片方のページを全部読んでからもう片方へ進み、縦書き"
+            "2 段組で上段末尾と下段先頭に割れた段落は連結する。off で yomitoku の順のまま"
+        ),
     ),
     out: Path | None = typer.Option(
         None, "--out", help="出力先ディレクトリ (省略時は book_dir に書き戻す)"
@@ -276,6 +287,7 @@ def ocr(
             figure=figure,
             searchable_pdf=searchable_pdf,
             source_pdf=source_pdf,
+            page_order=page_order,
         )
     except FileNotFoundError as e:
         typer.echo(str(e), err=True)
