@@ -25,6 +25,7 @@ dependencies = [
     "tqdm>=4.0",
     "ebooklib>=0.18",
     "markdown>=3.6",
+    "pymupdf>=1.28.2",
 ]
 
 [project.optional-dependencies]
@@ -111,6 +112,12 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["ebooklib", "ebooklib.*", "markdown", "markdown.*"]
 ignore_missing_imports = true
+
+# pymupdf は py.typed を同梱するが関数に型注釈が無い (1.28 時点)。
+# 呼び出し側だけ untyped call を許容する
+[[tool.mypy.overrides]]
+module = ["book_ocr.exporters.searchable_pdf"]
+disallow_untyped_calls = false
 
 [build-system]
 requires = ["hatchling"]

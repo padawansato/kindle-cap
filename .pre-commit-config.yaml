@@ -23,6 +23,7 @@ repos:
           - typer
           - img2pdf
           - pillow
+          - pymupdf
         args: [--strict]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
