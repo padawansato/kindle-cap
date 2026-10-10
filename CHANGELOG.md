@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-11
+
 ### Changed
 
 - `book-ocr --page-order`：縦書き本文の半面で、本文のどの段落よりも上にある見出し（ページ大見出し）をその半面の先頭に移すようにした。yomitoku はページ大見出しに遅い order を付けることがあり、本文 5 段落目の後に `# 見出し` が出ていた。横書き本文の半面は多段組で順序自体が崩れていることが多く、見出しだけ動かしても良くならないので触らない（issue #95 のフォローアップ）
@@ -181,7 +183,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/padawansato/kindle-cap/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/padawansato/kindle-cap/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/padawansato/kindle-cap/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/padawansato/kindle-cap/compare/v0.9.1...v0.10.0
