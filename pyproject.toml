@@ -26,6 +26,8 @@ dependencies = [
     "ebooklib>=0.18",
     "markdown>=3.6",
     "pymupdf>=1.28.2",
+    "pyobjc-framework-applicationservices>=12.2.2 ; sys_platform == 'darwin'",
+    "pyobjc-framework-quartz>=12.2.2 ; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +46,7 @@ Issues = "https://github.com/padawansato/kindle-cap/issues"
 [project.scripts]
 kindle-cap = "kindle_cap.cli:run_capture"
 kindle-cap-pdf = "kindle_cap.cli:run_rebuild_pdf"
+kindle-cap-all = "kindle_cap.cli:run_capture_all"
 book-ocr = "book_ocr.cli:run_ocr"
 book-epub = "book_epub.cli:run_build"
 
@@ -107,6 +110,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["tqdm", "tqdm.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["ApplicationServices", "Quartz", "objc"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
