@@ -13,6 +13,7 @@ from kindle_cap.capture import (
     _build_screencapture_args,
     _flatten_alpha,
     capture_rect,
+    crop_top,
 )
 from kindle_cap.config import Geometry
 
@@ -275,3 +276,44 @@ def test_capture_rect_logs_error_when_file_missing(
         capture_rect(Geometry(0, 0, 10, 10), out)
     assert "screencapture succeeded but file missing" in caplog.text
     assert "cannot write file" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# 純粋関数 crop_top: 撮影矩形の上端を削る (issue #69)
+# ---------------------------------------------------------------------------
+
+
+def test_crop_top_zero_returns_same_geometry() -> None:
+    g = Geometry(10, 20, 300, 400)
+    assert crop_top(g, 0) == g
+
+
+def test_crop_top_shifts_y_down_and_shrinks_height() -> None:
+    g = crop_top(Geometry(10, 20, 300, 400), 28)
+    assert g == Geometry(10, 48, 300, 372)
+
+
+def test_crop_top_keeps_x_and_width() -> None:
+    g = crop_top(Geometry(-1920, 0, 1920, 1080), 28)
+    assert (g.x, g.width) == (-1920, 1920)
+
+
+def test_crop_top_negative_rejected() -> None:
+    with pytest.raises(ValueError, match="crop_top"):
+        crop_top(Geometry(0, 0, 100, 100), -1)
+
+
+def test_crop_top_equal_to_height_rejected() -> None:
+    """高さ全部を削ると 0 行の矩形になるので拒否する."""
+    with pytest.raises(ValueError, match="crop_top"):
+        crop_top(Geometry(0, 0, 100, 100), 100)
+
+
+def test_crop_top_greater_than_height_rejected() -> None:
+    with pytest.raises(ValueError, match="crop_top"):
+        crop_top(Geometry(0, 0, 100, 100), 101)
+
+
+def test_crop_top_one_less_than_height_accepted() -> None:
+    g = crop_top(Geometry(0, 0, 100, 100), 99)
+    assert g == Geometry(0, 99, 100, 1)

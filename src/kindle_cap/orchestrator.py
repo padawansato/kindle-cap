@@ -7,14 +7,19 @@ import logging
 from pathlib import Path
 from time import sleep
 
-from .capture import capture_rect
-from .config import CaptureConfig
+from .capture import capture_rect, crop_top
+from .config import CaptureConfig, Geometry
 from .keys import send_next_page
 from .pdf import build_pdf
 from .preflight import detect_direction, preflight
 from .window import activate_kindle, get_window_geometry
 
 logger = logging.getLogger(__name__)
+
+
+def _window_geometry(config: CaptureConfig) -> Geometry:
+    """Kindle ウィンドウ frame を取り、config.crop_top ぶん上端を削って返す (issue #69)."""
+    return crop_top(get_window_geometry(), config.crop_top)
 
 
 def run(
@@ -37,7 +42,7 @@ def run(
 
         resolved_direction, initial_pngs = detect_direction(
             out_dir=out_dir,
-            geom_provider=get_window_geometry,
+            geom_provider=lambda: _window_geometry(config),
             activator=activate_kindle,
             capturer=capture_rect,
             sender=send_next_page,
@@ -102,7 +107,7 @@ def _capture_book(
             logger.info("[%d/%d] capturing page", i, config.pages)
             try:
                 activate_kindle()
-                geom = get_window_geometry()
+                geom = _window_geometry(config)
                 png_path = out_dir / f"page_{i:03d}.png"
                 capture_rect(geom, png_path)
             except Exception:
@@ -158,7 +163,7 @@ def _capture_book(
 
 def _run_dry(config: CaptureConfig) -> None:
     activate_kindle()
-    geom = get_window_geometry()
+    geom = _window_geometry(config)
     dry_path = config.out / "dry_run.png"
     capture_rect(geom, dry_path)
     logger.info("window geometry: x=%d y=%d w=%d h=%d", geom.x, geom.y, geom.width, geom.height)

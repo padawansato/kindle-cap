@@ -28,6 +28,8 @@ class CaptureConfig:
     keep_png: bool
     pdf_jpeg_quality: int | None = None
     progress: bool = False
+    # issue #69: 撮影矩形の上端から削る量 (論理ポイント)。タイトルバー / 信号機ボタン除外用
+    crop_top: int = 0
 
     def __post_init__(self) -> None:
         if self.pages <= 0:
@@ -44,3 +46,5 @@ class CaptureConfig:
             raise ValueError("name must not be '.' or '..'")
         if self.pdf_jpeg_quality is not None and not (1 <= self.pdf_jpeg_quality <= 100):
             raise ValueError(f"pdf_jpeg_quality must be in 1..100 (got {self.pdf_jpeg_quality})")
+        if self.crop_top < 0:
+            raise ValueError(f"crop_top must be >= 0 (got {self.crop_top})")

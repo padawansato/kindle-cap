@@ -109,6 +109,15 @@ def capture(
             "表示 (1000+ ページ書籍向け、issue #53)"
         ),
     ),
+    crop_top: int = typer.Option(
+        0,
+        "--crop-top",
+        help=(
+            "撮影矩形の上端から削る量 (論理ポイント)。System Events のウィンドウ frame は"
+            "タイトルバー (信号機ボタン) を含むため、固定型書籍で写り込む場合に指定。"
+            "まず --dry-run で値を確認 (issue #69)"
+        ),
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -152,6 +161,7 @@ def capture(
             keep_png=keep_png,
             pdf_jpeg_quality=pdf_jpeg_quality,
             progress=progress,
+            crop_top=crop_top,
         )
     except ValueError as e:
         raise typer.BadParameter(str(e)) from e
@@ -169,6 +179,7 @@ def capture(
         WindowGeometryError,
         KindleActivationError,
         KeystrokeError,
+        ValueError,  # crop_top >= ウィンドウ高さ など、実機で初めて分かる設定不整合 (issue #69)
     ) as e:
         logger.error("%s", e)
         raise typer.Exit(code=1) from e

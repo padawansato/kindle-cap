@@ -690,3 +690,78 @@ def test_capture_keystroke_error_exits_nonzero(mock_run: MagicMock, tmp_path: Pa
     )
     assert result.exit_code != 0
     assert "keystroke failed" in result.output
+
+
+# ---------------------------------------------------------------------------
+# --crop-top (issue #69)
+# ---------------------------------------------------------------------------
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_crop_top_default_is_zero(mock_run: MagicMock, tmp_path: Path) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.args[0].crop_top == 0
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_crop_top_passes_through(mock_run: MagicMock, tmp_path: Path) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        [
+            "--name",
+            "x",
+            "--pages",
+            "1",
+            "--direction",
+            "rtl",
+            "--out",
+            str(tmp_path),
+            "--crop-top",
+            "28",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.args[0].crop_top == 28
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_crop_top_negative_exits_nonzero(mock_run: MagicMock, tmp_path: Path) -> None:
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        [
+            "--name",
+            "x",
+            "--pages",
+            "1",
+            "--direction",
+            "rtl",
+            "--out",
+            str(tmp_path),
+            "--crop-top",
+            "-1",
+        ],
+    )
+    assert result.exit_code != 0
+    assert not mock_run.called
+
+
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_value_error_from_orchestrator_exits_one(
+    mock_run: MagicMock, tmp_path: Path
+) -> None:
+    """crop_top がウィンドウ高さ以上のとき orchestrator が ValueError を投げる。traceback ではなく exit 1."""
+    mock_run.side_effect = ValueError("crop_top must be smaller than window height")
+    app = _make_app(capture)
+    result = runner.invoke(
+        app,
+        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+    )
+    assert result.exit_code == 1
+    assert not isinstance(result.exception, ValueError)

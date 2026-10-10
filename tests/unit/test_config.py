@@ -240,3 +240,23 @@ def test_config_pdf_jpeg_quality_one_oh_one_rejected() -> None:
 def test_config_pdf_jpeg_quality_negative_rejected() -> None:
     with pytest.raises(ValueError, match="pdf_jpeg_quality"):
         CaptureConfig(**_valid_config_kwargs(pdf_jpeg_quality=-1))
+
+
+# ---------------------------------------------------------------------------
+# CaptureConfig: crop_top 境界値 (issue #69)
+# ---------------------------------------------------------------------------
+
+
+def test_config_crop_top_default_is_zero() -> None:
+    c = CaptureConfig(**_valid_config_kwargs())
+    assert c.crop_top == 0
+
+
+def test_config_crop_top_accepts_positive_int() -> None:
+    c = CaptureConfig(**_valid_config_kwargs(crop_top=28))
+    assert c.crop_top == 28
+
+
+def test_config_crop_top_negative_rejected() -> None:
+    with pytest.raises(ValueError, match="crop_top"):
+        CaptureConfig(**_valid_config_kwargs(crop_top=-1))

@@ -15,6 +15,24 @@ class CaptureError(RuntimeError):
     pass
 
 
+def crop_top(geom: Geometry, points: int) -> Geometry:
+    """撮影矩形の上端を `points` (論理ポイント) だけ削った Geometry を返す。
+
+    System Events が返すウィンドウ frame はタイトルバー (信号機ボタン) を含むため、
+    固定型書籍ではページ画像の上端にボタンが写り込む (issue #69)。screencapture -R は
+    論理座標を取るので、Retina でも points はそのまま渡せる。
+    """
+    if points < 0:
+        raise ValueError(f"crop_top must be >= 0 (got {points})")
+    if points >= geom.height:
+        raise ValueError(
+            f"crop_top must be smaller than window height (crop_top={points}, height={geom.height})"
+        )
+    if points == 0:
+        return geom
+    return Geometry(x=geom.x, y=geom.y + points, width=geom.width, height=geom.height - points)
+
+
 def _build_screencapture_args(geom: Geometry, out_path: Path) -> list[str]:
     rect = f"{geom.x},{geom.y},{geom.width},{geom.height}"
     return ["screencapture", "-R", rect, "-x", str(out_path)]
