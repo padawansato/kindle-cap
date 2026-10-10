@@ -139,7 +139,9 @@ def _image_size_px(page: pymupdf.Page) -> tuple[int, int]:
     """ページに載っている (最初の) 画像のピクセルサイズ。px→pt の縮尺に使う."""
     images = page.get_images()
     if not images:
-        raise SearchablePdfError(f"ページ {page.number + 1} に画像がありません (画像 PDF ではない?)")
+        raise SearchablePdfError(
+            f"ページ {page.number + 1} に画像がありません (画像 PDF ではない?)"
+        )
     _xref, _smask, width, height, *_ = images[0]
     return int(width), int(height)
 

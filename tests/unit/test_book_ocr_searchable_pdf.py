@@ -48,7 +48,13 @@ PAGE_JSON: dict[str, Any] = {
         _para([40, 40, 420, 160], order=2),
         _para([600, 40, 700, 350], order=4),
     ],
-    "figures": [{"box": [40, 400, 300, 500], "order": 0, "paragraphs": [_para([40, 400, 300, 500], order=0)]}],
+    "figures": [
+        {
+            "box": [40, 400, 300, 500],
+            "order": 0,
+            "paragraphs": [_para([40, 400, 300, 500], order=0)],
+        }
+    ],
     "tables": [{"box": [320, 400, 560, 500], "order": 1}],
     "words": [
         _word("深い眠り", 40, 250, 200, 290),
@@ -109,7 +115,9 @@ def test_build_image_pdf_matches_kindle_cap_scale(tmp_path: Path, image_pdf: Pat
     assert (doc[0].rect.width, doc[0].rect.height) == (PNG_W * 0.75, PNG_H * 0.75)
 
 
-def test_overlay_makes_every_word_copyable(tmp_path: Path, image_pdf: Path, page_json: Path) -> None:
+def test_overlay_makes_every_word_copyable(
+    tmp_path: Path, image_pdf: Path, page_json: Path
+) -> None:
     out = tmp_path / "book.searchable.pdf"
     result = overlay_text_layer(image_pdf, out, {2: page_json})
     assert (result.pages_written, result.words_written) == (1, 10)
@@ -129,7 +137,9 @@ def test_overlay_makes_every_word_copyable(tmp_path: Path, image_pdf: Path, page
     assert out.stat().st_size - image_pdf.stat().st_size < 200 * 1024
 
 
-def test_overlay_places_words_on_their_boxes(tmp_path: Path, image_pdf: Path, page_json: Path) -> None:
+def test_overlay_places_words_on_their_boxes(
+    tmp_path: Path, image_pdf: Path, page_json: Path
+) -> None:
     """抽出した語の矩形が JSON の bbox (px→pt) に重なる。ずれると選択範囲が本文からずれる。
     同じ行で隣接する語は抽出時に 1 語に連結されるので、部分文字列で引く。"""
     out = tmp_path / "book.searchable.pdf"
@@ -164,6 +174,9 @@ def test_overlay_removes_partial_output_on_enospc(
     def boom(*_: Any, **__: Any) -> None:
         raise OSError(errno.ENOSPC, "No space left on device")
 
-    with patch("pymupdf.Document.save", boom), pytest.raises(SearchablePdfError, match="ディスク容量"):
+    with (
+        patch("pymupdf.Document.save", boom),
+        pytest.raises(SearchablePdfError, match="ディスク容量"),
+    ):
         overlay_text_layer(image_pdf, out, {2: page_json})
     assert not out.exists()
