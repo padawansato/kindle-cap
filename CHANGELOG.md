@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-11
+
 ### Changed
 
 - **breaking**: `kindle-cap` の `--pages`（必須）と `--auto-stop` を廃止し、`kindle-cap-all` と同じ `--max-pages`（既定 3000）に統一した。書籍末尾の自動検出（同一ページが 2 回続いたら停止）は常時 on になり、ページ数を事前に調べて指定する必要がなくなった。`--max-pages` は終端検出が効かなかったときの保険で、上限に達して止まった場合は「書籍末尾は未検出」と警告を出す（終端で止まったのか上限で切れたのかを後から区別できるようにするため。`--pages 1000` で撮った書籍が実は 1000 ページ超だった事例があった）。旧フラグを渡すとエラーになるので、シェル履歴や `&&` 連結スクリプトの `--pages N --auto-stop` を削除すること
@@ -140,7 +142,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/padawansato/kindle-cap/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/padawansato/kindle-cap/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/padawansato/kindle-cap/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/padawansato/kindle-cap/compare/v0.5.0...v0.6.0
