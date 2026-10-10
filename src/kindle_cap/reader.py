@@ -119,3 +119,32 @@ def rewind_to_start(
         return _direction_for_prev(KEY_LEFT)
     press_until_stable(KEY_RIGHT)
     return _direction_for_prev(KEY_RIGHT)
+
+
+def restore_position(
+    saved: Status | None,
+    *,
+    goto: Callable[[int], None],
+    read_status: Callable[[], Status | None],
+) -> bool:
+    """撮影前に記録した位置 `saved` へ戻す。戻して位置が一致したら True.
+
+    `saved` が None (表紙などステータス文が無い) か 1 (先頭) なら、撮影は先頭から
+    始まって先頭の状態と区別が付かないので戻さない。`goto` はリーダーの
+    「次の位置No.に移動:」ダイアログに番号を入れて移動する I/O 側の関数。
+    失敗しても撮影結果は失いたくないので、例外は握って警告にとどめる。"""
+    if saved is None or saved[1] <= 1:
+        logger.info("撮影前の位置は先頭 (%s) なので戻しません", saved)
+        return False
+    target = saved[1]
+    try:
+        goto(target)
+        after = read_status()
+    except Exception as e:
+        logger.warning("読書位置を %d に戻せませんでした: %s", target, e)
+        return False
+    if after is None or after[1] != target:
+        logger.warning("読書位置を %d に戻そうとしましたが %s に着きました", target, after)
+        return False
+    logger.info("読書位置を %d / %d に戻しました", target, saved[0])
+    return True

@@ -14,7 +14,14 @@ import pytest
 from kindle_cap.batch import BookResult, run_all, select_books
 from kindle_cap.config import Direction
 from kindle_cap.library import Book, parse_book, safe_name
-from kindle_cap.reader import KEY_LEFT, KEY_RIGHT, parse_status, rewind_to_start
+from kindle_cap.reader import (
+    KEY_LEFT,
+    KEY_RIGHT,
+    Status,
+    parse_status,
+    restore_position,
+    rewind_to_start,
+)
 
 # ---------------------------------------------------------------------------
 # AX の生文字列 → Book
@@ -144,6 +151,43 @@ def test_rewind_to_start_gives_up_when_screen_never_settles() -> None:
         )
 
 
+def test_restore_position_returns_to_saved_page_only_when_it_is_worth_it() -> None:
+    """撮影前の位置を記録 → 先頭へ → 元の位置へ戻す。位置が読めない (表紙) / 先頭だった
+    なら移動ダイアログを開かない。移動先が食い違えば False (撮影結果は捨てない)。"""
+    book = FakeReader(n_pages=183, next_key=KEY_RIGHT, pos=99)
+    gotos: list[int] = []
+
+    def goto(n: int) -> None:
+        gotos.append(n)
+        book.pos = n - 1
+
+    saved = book.read_status()
+    rewind_to_start(
+        press=book.press,
+        page_hash=book.page_hash,
+        read_status=book.read_status,
+        sleeper=lambda _: None,
+        wait=0.0,
+    )
+    assert book.pos == 0
+    assert restore_position(saved, goto=goto, read_status=book.read_status) is True
+    assert (gotos, book.read_status()) == ([100], (183, 100))
+
+    gotos.clear()
+    assert restore_position(None, goto=goto, read_status=book.read_status) is False  # 表紙
+    assert restore_position((183, 1), goto=goto, read_status=book.read_status) is False
+    assert gotos == []
+
+    # 移動したが別の位置に着いた (位置番号と表示の丸めなど) → 警告扱いで False
+    assert restore_position((183, 50), goto=lambda n: None, read_status=lambda: (183, 49)) is False
+
+    # 移動ダイアログが例外を投げても呼び出し側には伝えない
+    def broken(n: int) -> None:
+        raise RuntimeError("「次の位置No.に移動」が見つかりません")
+
+    assert restore_position((183, 50), goto=broken, read_status=book.read_status) is False
+
+
 # ---------------------------------------------------------------------------
 # 一括ループ
 # ---------------------------------------------------------------------------
@@ -216,6 +260,57 @@ def test_run_all_continues_after_a_failure_and_always_closes_the_book(tmp_path: 
         "close",
     ]
     assert isinstance(results[0], BookResult)
+
+
+def test_run_all_restores_reading_position_before_closing_even_if_capture_fails(
+    tmp_path: Path,
+) -> None:
+    """open → 位置記録 → 撮影 → 位置復元 → close の順。撮影が失敗しても戻し、
+    復元が失敗しても撮影結果は captured のまま。"""
+    books = [_book("撮れない本"), _book("戻せない本"), _book("普通の本")]
+    log: list[str] = []
+    current: dict[str, str] = {}
+
+    def open_book(b: Book) -> None:
+        current["title"] = b.title
+        log.append(f"open:{b.title}")
+
+    def capture_book(b: Book, name: str) -> None:
+        log.append("capture")
+        if b.title == "撮れない本":
+            raise RuntimeError("撮影に失敗")
+
+    def save_position() -> Status | None:
+        log.append("save")
+        return (100, 42)
+
+    def restore(saved: Status | None) -> None:
+        log.append(f"restore:{saved}")
+        if current["title"] == "戻せない本":
+            raise RuntimeError("移動ダイアログが開かない")
+
+    results = run_all(
+        books,
+        out=tmp_path,
+        include_pdf=False,
+        only=None,
+        limit=None,
+        open_book=open_book,
+        close_book=lambda: log.append("close"),
+        capture_book=capture_book,
+        save_position=save_position,
+        restore_position=restore,
+    )
+    assert [r.status for r in results] == ["failed", "captured", "captured"]
+    per_book = ["save", "capture", "restore:(100, 42)", "close"]
+    assert log == [
+        "open:撮れない本",
+        *per_book,
+        "open:戻せない本",
+        *per_book,
+        "open:普通の本",
+        *per_book,
+    ]
 
 
 # ---------------------------------------------------------------------------
