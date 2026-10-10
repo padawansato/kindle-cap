@@ -6,6 +6,9 @@
 
 ### Added
 
+- `book_ocr.exporters.searchable_pdf`：OCR の生 JSON（`pages/page_NNN.json`）から、kindle-cap が作った画像 PDF に不可視テキスト層を重ねてコピー・検索できる PDF を作る exporter を追加（issue #70）。yomitoku 標準の `create_searchable_pdf` は語の 15〜20% を落とし、縦書きを全角化（「6時半」→「６時半」）して 1 文字ずつ描くため使わず、全 `words[]` をそれぞれの矩形に語単位で描く。段落・図・表は読み順の決定にだけ使う。PDF を作り直さないので画像の再エンコードが無く、出力は元 PDF + 数十 KB。CLI からの呼び出しは次の PR
+- 依存に `pymupdf` を追加（AGPL。個人利用 CLI のため許容）
+
 - `kindle-cap --crop-top N`：撮影矩形の上端から N 論理ポイントを削る。System Events が返すウィンドウ frame はタイトルバー（信号機ボタン）を含むため、固定型書籍ではページ画像上端にボタンが写り込んでいた。既定値 0 で従来と同じ挙動。`--dry-run` / `--auto-direction` の試写にも同じ crop が適用される。`CaptureConfig.crop_top` と純粋関数 `kindle_cap.capture.crop_top(geom, points)` を追加（issue #69）
 
 ### Changed

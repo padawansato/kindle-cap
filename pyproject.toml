@@ -25,6 +25,7 @@ dependencies = [
     "tqdm>=4.0",
     "ebooklib>=0.18",
     "markdown>=3.6",
+    "pymupdf>=1.28.2",
 ]
 
 [project.optional-dependencies]
