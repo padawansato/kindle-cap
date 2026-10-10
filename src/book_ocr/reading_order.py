@@ -28,6 +28,9 @@ PAGE_ORDERS = ("auto", "rtl", "ltr", "off")
 
 _TERMINAL = tuple("。．.！!？?」』）)】")
 _INDENT = ("　", " ")
+# 下段の先頭がこれらで始まる段落は新しい項目 (箇条書き・見出し・引用) なので文の続きではない。
+# 実書籍 93 ページの連結候補を目視した結果、誤連結はすべて「○」で始まる箇条書きだった
+_OPENERS = tuple("○●◎◇◆□■▶▷・※「『（(【［[〈《")
 _CENTER_TOLERANCE = 0.02  # 画像幅に対する比。中央帯にかかる要素は「またぐ」と見なさない
 _KINDS = ("paragraphs", "tables", "figures")
 
@@ -108,7 +111,7 @@ def _find_continuation(
     top = min(p["box"][1] for p in below)
     tier = [p for p in below if p["box"][1] < top + (p["box"][3] - p["box"][1]) * 0.5]
     b = max(tier, key=lambda p: p["box"][2])
-    if b["contents"].startswith(_INDENT):
+    if b["contents"].startswith(_INDENT) or b["contents"].startswith(_OPENERS):
         return None
     return b
 
