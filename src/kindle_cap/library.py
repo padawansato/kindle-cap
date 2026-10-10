@@ -17,6 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from . import ax
+from .background import post_key
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,10 @@ _DOWNLOADED = "ダウンロードされました"
 _NOT_DOWNLOADED = "本はダウンロードされていません"
 _CLOSE_BOOK = "本を閉じる"
 _CLOSE_SHEET = "閉じる"  # 書籍情報シート (サンプルを開くと出る) の閉じるボタン
+# 読書位置の同期シート (本を開いた直後に出る。「最新の位置に移動」/「位置Nに戻る」)。
+# ハンドルも「閉じる」と名乗るが AXPress は効かず、Escape で消える (issue #86)
+_SYNC_SHEET_RE = re.compile(r"最新の位置に移動|位置\s*\d+に戻る")
+_KEY_ESCAPE = 53
 _MAX_NAME_LEN = 80
 
 
@@ -232,9 +237,19 @@ def open_book(
 
 
 def dismiss_sheet(app: ax.AXElement) -> bool:
-    """リーダーに被さる書籍情報シート (「閉じる」「シェア」) があれば閉じる.
+    """リーダーに被さるシートがあれば閉じる。閉じたら True.
 
-    サンプル本を開いたときに出る。出ている間は chrome (本を閉じる等) に届かない。"""
+    - 読書位置の同期シート (「最新の位置に移動」「位置Nに戻る」): 本を開いた直後に出て、
+      ページ送りしても残りページ画像に写り込む。Kindle の pid 宛て Escape で消える
+      (前面でなくてよい) (issue #86)
+    - 書籍情報シート (「閉じる」「シェア」): サンプル本を開いたときに出る。出ている間は
+      chrome (本を閉じる等) に届かない。「閉じる」を AXPress
+    """
+    if ax.find(app, "AXButton", lambda d: _SYNC_SHEET_RE.search(d) is not None):
+        logger.info("読書位置の同期シートを閉じます (Escape)")
+        post_key(_KEY_ESCAPE)
+        time.sleep(1.0)
+        return True
     buttons = ax.find(app, "AXButton", lambda d: d == _CLOSE_SHEET)
     if not buttons:
         return False

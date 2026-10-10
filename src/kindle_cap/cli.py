@@ -5,8 +5,10 @@ import logging
 import re
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from time import sleep
+from typing import Any
 
 import typer
 
@@ -189,6 +191,7 @@ def capture(
             dry_run=dry_run,
             auto_stop=True,
             auto_direction=auto_direction,
+            before_capture=_sheet_dismisser(),
         )
     except (
         PreflightError,
@@ -200,6 +203,30 @@ def capture(
     ) as e:
         logger.error("%s", e)
         raise typer.Exit(code=1) from e
+
+
+def _sheet_dismisser() -> Callable[[], None]:
+    """各ページの撮影直前に、リーダーに被さるシート (読書位置の同期など) を閉じる hook.
+
+    AX (PyObjC) は初回呼び出し時に遅延初期化する。アクセシビリティ権限が無いなどで
+    使えなければ一度だけ警告して以後は何もしない (撮影自体は続ける) (issue #86)。
+    """
+    from . import ax, library
+
+    state: dict[str, Any] = {"app": None, "disabled": False}
+
+    def hook() -> None:
+        if state["disabled"]:
+            return
+        try:
+            if state["app"] is None:
+                state["app"] = ax.app_element()
+            library.dismiss_sheet(state["app"])
+        except ax.KindleAXError as e:
+            logger.warning("シートの自動クローズを無効化します: %s", e)
+            state["disabled"] = True
+
+    return hook
 
 
 def rebuild_pdf(
