@@ -16,12 +16,12 @@ def _texts(pages: list[SourcePage]) -> list[str]:
 
 def test_sentence_cut_at_page_end_is_joined_with_next_page_head() -> None:
     pages = _pages(
-        "# 見出し\n\n前の段落。\n\nページ末尾で切れ<br>た文の前半",
+        "# 見出し\n\n前の段落。\n\nページ末尾で、折り返しながら<br>切れた文の前半",
         "後半はここに続く。\n\n次の段落。",
     )
     result = join_cross_page_sentences(pages)
     assert _texts(result) == [
-        "# 見出し\n\n前の段落。\n\nページ末尾で切れ<br>た文の前半後半はここに続く。",
+        "# 見出し\n\n前の段落。\n\nページ末尾で、折り返しながら<br>切れた文の前半後半はここに続く。",
         "次の段落。",
     ]
     # page_number は保たれ、入力は変更されない
@@ -69,24 +69,30 @@ def test_not_joined_across_skipped_page_numbers() -> None:
 
 
 def test_ascii_boundary_gets_a_space_and_emptied_page_is_kept() -> None:
-    pages = _pages("the quick brown", "fox jumps.", "次のページ。")
+    pages = _pages("the quick brown fox<br>jumps over the", "lazy dog.", "次のページ。")
     result = join_cross_page_sentences(pages)
-    assert _texts(result) == ["the quick brown fox jumps.", "", "次のページ。"]
+    assert _texts(result) == ["the quick brown fox<br>jumps over the lazy dog.", "", "次のページ。"]
     assert [p.page_number for p in result] == [1, 2, 3]
 
 
 def test_join_happens_once_per_pair_without_chaining() -> None:
     # 各組は結合後の状態で 1 回だけ判定する。2 の残りブロックは 2→3 の組として結合される
-    pages = _pages("一ページ目の途中", "二ページ目の頭\n\n二ページ目の途中", "三ページ目の頭。")
+    pages = _pages(
+        "一ページ目は、折り返し<br>ながら途中で切れる",
+        "二ページ目の頭\n\n二ページ目は、折り返し<br>ながら途中で切れる",
+        "三ページ目の頭。",
+    )
     assert _texts(join_cross_page_sentences(pages)) == [
-        "一ページ目の途中二ページ目の頭",
-        "二ページ目の途中三ページ目の頭。",
+        "一ページ目は、折り返し<br>ながら途中で切れる二ページ目の頭",
+        "二ページ目は、折り返し<br>ながら途中で切れる三ページ目の頭。",
         "",
     ]
     # 2 が丸ごと 1 に取り込まれて空になっても、1 の末尾が 3 の先頭まで取り込むことはない
-    pages = _pages("一ページ目の途中", "二ページ目の全部", "三ページ目の頭。")
+    pages = _pages(
+        "一ページ目は、折り返し<br>ながら途中で切れる", "二ページ目の全部", "三ページ目の頭。"
+    )
     assert _texts(join_cross_page_sentences(pages)) == [
-        "一ページ目の途中二ページ目の全部",
+        "一ページ目は、折り返し<br>ながら途中で切れる二ページ目の全部",
         "",
         "三ページ目の頭。",
     ]
@@ -96,13 +102,30 @@ def test_blocks_dropped_by_converter_are_skipped_to_find_the_real_boundary() -> 
     # ノンブル・書名の柱・1 文字段落は EPUB 変換時に落とされる (converter)。
     # それらを飛ばした実質の末尾段落と先頭段落を結合し、飛ばしたブロックはその場に残す
     pages = _pages(
-        "運動が継続しない人は、「疲れ\n\n134\n\n体調管理の本",
+        "運動が継続しない人は、<br>「疲れ\n\n134\n\n体調管理の本",
         "体調管理の本\n\n法\n\nているから明日から」と先延ばしにする。\n\n次の段落。",
     )
     assert _texts(join_cross_page_sentences(pages, title="体調管理の本")) == [
-        "運動が継続しない人は、「疲れているから明日から」と先延ばしにする。\n\n134\n\n体調管理の本",
+        "運動が継続しない人は、<br>「疲れているから明日から」と先延ばしにする。\n\n134\n\n体調管理の本",
         "体調管理の本\n\n法\n\n次の段落。",
     ]
-    # title を渡さなければ柱は普通の段落として扱われ、終端記号が無くても柱同士は結合する。
-    # それを避けるため CLI は書名を渡す
-    assert _texts(join_cross_page_sentences(pages))[1].startswith("法")
+    # title を渡さなければ柱は普通の段落として扱われるが、1 行だけなので折り返し本文とは
+    # 見なされず結合しない (本物の境界「疲れ」+「ているから」も柱に隠れて見つからない)
+    assert _texts(join_cross_page_sentences(pages)) == [p.markdown for p in pages]
+
+
+def test_short_single_line_tail_such_as_caption_is_not_joined() -> None:
+    """誤結合の典型: 1 行の小見出し・図キャプション（句点なし）が A 側。
+    折り返しの無い 1 行、または折り返しても短く読点も無いブロックは結合しない"""
+    caption = _pages(
+        "本文。\n\n猫背で姿勢が悪くなる", "の中には、生まれつき筋肉の張りが弱い人もいる。"
+    )
+    assert _texts(join_cross_page_sentences(caption)) == [p.markdown for p in caption]
+    short_wrapped = _pages("本文。\n\n靴ひもが<br>結べない", "ある。")
+    assert _texts(join_cross_page_sentences(short_wrapped)) == [p.markdown for p in short_wrapped]
+    # 折り返しが無くても 30 文字以上で読点があるような本文は対象 (2 行以上は必須)
+    long_wrapped = _pages(
+        "本文。\n\n運動が継続しない人は、いつも理由を探している。「疲れ<br>ているから明日から」と",
+        "言い訳が続く。",
+    )
+    assert _texts(join_cross_page_sentences(long_wrapped))[0].endswith("と言い訳が続く。")

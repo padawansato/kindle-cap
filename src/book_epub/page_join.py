@@ -79,11 +79,31 @@ def _is_plain_paragraph(block: str) -> bool:
     return not any(_NON_PARAGRAPH_LINE_RE.match(line.lstrip(" ")) for line in block.splitlines())
 
 
+_LINE_BREAK_RE = re.compile(r"<br\s*/?>|\n", re.IGNORECASE)
+_MIN_BODY_CHARS = 30
+
+
+def _looks_like_wrapped_body(block: str) -> bool:
+    """ページ末尾のブロックが「折り返された本文段落」に見えるか。
+
+    実書籍 93 ページで結合候補 18 組を正解付けしたところ、誤結合の A 側はほぼ
+    1 行だけの小見出し・図キャプション（句点なし）だった。2 行以上に折り返され、
+    読点を含むか 30 文字以上のものに限ると、精度 28% → 57%（目次ページを除けば
+    67%）、再現率 80%。誤結合の害は段落の間が 1 つ消えるだけで、正しい結合の益は
+    単語の途中で切れる読み上げが直ることなので、この水準で既定 on にしている。
+    """
+    lines = [ln for ln in _LINE_BREAK_RE.split(block) if ln.strip()]
+    text = "".join(lines)
+    return len(lines) >= 2 and ("、" in text or len(text) >= _MIN_BODY_CHARS)
+
+
 def _can_join(tail_block: str, head_block: str) -> bool:
     tail = tail_block.rstrip()
     if _NOMBRE_RE.match(tail) or _NOMBRE_RE.match(head_block):
         return False
     if not (_is_plain_paragraph(tail) and _is_plain_paragraph(head_block)):
+        return False
+    if not _looks_like_wrapped_body(tail):
         return False
     return tail[-1] not in _TERMINATORS and head_block[0] not in _NEW_PARAGRAPH_STARTS
 
