@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-11
+
 ### Added
 
 - `book-epub --join-pages/--no-join-pages`（既定 on）：ページ末尾で切れた文を次ページ先頭の段落と連結してから EPUB を組み立てるようにした。ページをまたぐ文が段落ごと割れ、読み上げ（Kindle の Assistive Reader）でページ境界ごとに不自然に途切れていたため。終端記号で終わる段落、見出し・字下げ・箇条書き・開き括弧で始まる段落、数字と記号だけのブロック、`--skip-pages` で間が抜けたページの組は連結しない。EPUB 変換時に落ちるノンブル・柱・1 文字段落は飛ばして、その内側の段落同士をつなぐ。実書籍 93 ページで 18 組が連結された。`pages/*.md` は変更しない
@@ -204,7 +206,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/padawansato/kindle-cap/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/padawansato/kindle-cap/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/padawansato/kindle-cap/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/padawansato/kindle-cap/compare/v0.12.0...v0.13.0
