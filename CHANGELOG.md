@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-10
+
 ### Changed
 
 - `book-ocr --searchable-pdf`：テキスト層の描画を語ごとの `TextWriter` から「縦横の向きが同じ連続する語の run」ごとにまとめ、1000 ページの所要時間を 136 秒 → 68 秒、出力サイズの増分を 28MB → 7MB に減らした。抽出順・座標は変わらない（issue #70）
@@ -127,7 +129,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/padawansato/kindle-cap/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/padawansato/kindle-cap/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/padawansato/kindle-cap/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/padawansato/kindle-cap/compare/v0.3.0...v0.4.0
