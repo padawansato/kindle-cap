@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-10
+
 ### Added
 
 - `book_ocr.exporters.searchable_pdf`：OCR の生 JSON（`pages/page_NNN.json`）から、kindle-cap が作った画像 PDF に不可視テキスト層を重ねてコピー・検索できる PDF を作る exporter を追加（issue #70）。yomitoku 標準の `create_searchable_pdf` は語の 15〜20% を落とし、縦書きを全角化（「6時半」→「６時半」）して 1 文字ずつ描くため使わず、全 `words[]` をそれぞれの矩形に語単位で描く。段落・図・表は読み順の決定にだけ使う。PDF を作り直さないので画像の再エンコードが無く、出力は元 PDF + 数十 KB。CLI からの呼び出しは次の PR
@@ -121,7 +123,10 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/padawansato/kindle-cap/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/padawansato/kindle-cap/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/padawansato/kindle-cap/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/padawansato/kindle-cap/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/padawansato/kindle-cap/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/padawansato/kindle-cap/compare/v0.1.0...v0.2.0
