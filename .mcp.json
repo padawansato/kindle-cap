@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "voicevox": {
+      "command": "npx",
+      "args": ["-y", "@kajidog/mcp-tts-voicevox"],
+      "env": {
+        "VOICEVOX_URL": "http://127.0.0.1:50021",
+        "VOICEVOX_DEFAULT_SPEAKER": "2",
+        "VOICEVOX_DEFAULT_SPEED_SCALE": "1.5",
+        "VOICEVOX_DISABLED_GROUPS": "apps"
+      }
+    }
+  }
+}
