@@ -14,6 +14,11 @@ from book_ocr import orchestrator, writer
 from book_ocr.engines.yomitoku import YomiTokuEngine
 from book_ocr.exporters.book_md import render_book_md
 from book_ocr.exporters.json_index import render_index
+from book_ocr.exporters.searchable_pdf import (
+    SearchablePdfError,
+    build_image_pdf,
+    overlay_text_layer,
+)
 from book_ocr.models import BookMetadata, PageText
 from book_ocr.preflight import PreflightError, check_disk_space
 from book_ocr.protocols import OCREngine
@@ -38,8 +43,14 @@ def run_ocr_pipeline(
     skip_existing: bool = False,
     ignore_disk_check: bool = False,
     figure: bool = True,
+    searchable_pdf: bool = False,
+    source_pdf: Path | None = None,
 ) -> Path:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を出力する.
+
+    `searchable_pdf=True` なら OCR の生 JSON から `<out_dir>/<title>.searchable.pdf` も
+    作る (issue #70)。元画像は `source_pdf` (省略時は kindle-cap が書いた
+    `<book_dir の親>/<book_dir 名>.pdf`)。無ければ book_dir の全 PNG から組む。
 
     `engine=None` のときは `YomiTokuEngine` を生成する。テストでは FakeEngine 等を渡す。
 
@@ -64,9 +75,19 @@ def run_ocr_pipeline(
 
     title = name or book_dir.name
     out_dir = out or book_dir
+    pdf_out = out_dir / f"{title}.searchable.pdf"
+    pdf_src = source_pdf or book_dir.parent / f"{book_dir.name}.pdf"
 
     if not ignore_disk_check:
-        check_disk_space(pngs=pngs, out_dir=out_dir, chunk_size=chunk_size)
+        extra = 0
+        if searchable_pdf:
+            # 元 PDF のコピー + テキスト層 (元 PDF が無ければ PNG を全部載せる)
+            extra = (
+                pdf_src.stat().st_size
+                if pdf_src.exists()
+                else sum(p.stat().st_size for p in all_pngs)
+            )
+        check_disk_space(pngs=pngs, out_dir=out_dir, chunk_size=chunk_size, extra_bytes=extra)
 
     engine = engine or YomiTokuEngine(
         device=device,
@@ -116,6 +137,10 @@ def run_ocr_pipeline(
         book_md_str = render_book_md(pages)
     duration_sec = time.perf_counter() - t0
     finished_at = datetime.now(UTC)
+
+    if searchable_pdf:
+        _build_searchable_pdf(pages, all_pngs, pdf_src, pdf_out)
+        initial_meta = replace(initial_meta, searchable_pdf=pdf_out.name)
 
     meta = replace(
         initial_meta,
@@ -217,6 +242,20 @@ def ocr(
             "図中テキストも --figure_letter で本文に含める。"
         ),
     ),
+    searchable_pdf: bool = typer.Option(
+        False,
+        "--searchable-pdf",
+        help=(
+            "OCR 結果から文字をコピー・検索できる PDF `<title>.searchable.pdf` を作る (issue #70)。"
+            "kindle-cap の `<book>.pdf` に不可視テキスト層を重ねる。"
+            "--skip-existing と併用すれば再 OCR なしで PDF だけ作り直せる。"
+        ),
+    ),
+    source_pdf: Path | None = typer.Option(
+        None,
+        "--source-pdf",
+        help="--searchable-pdf の元になる画像 PDF (省略時は `<book_dir の親>/<book_dir 名>.pdf`)。",
+    ),
 ) -> None:
     """指定した book_dir 内の page_*.png を OCR して Markdown / index.json を生成する."""
     try:
@@ -235,6 +274,8 @@ def ocr(
             skip_existing=skip_existing,
             ignore_disk_check=ignore_disk_check,
             figure=figure,
+            searchable_pdf=searchable_pdf,
+            source_pdf=source_pdf,
         )
     except FileNotFoundError as e:
         typer.echo(str(e), err=True)
@@ -242,10 +283,12 @@ def ocr(
     except ValueError as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1) from e
-    except PreflightError as e:
+    except (PreflightError, SearchablePdfError) as e:
         typer.echo(f"[エラー] {e}", err=True)
         raise typer.Exit(1) from e
     typer.echo(f"OCR complete: {out_path}")
+    if searchable_pdf:
+        typer.echo(f"searchable PDF: {out_path.with_name(out_path.stem + '.searchable.pdf')}")
 
 
 def _parse_page_number(p: Path) -> int:
@@ -272,15 +315,47 @@ def _partition_existing_pages(
         content = md_path.read_text(encoding="utf-8")
         body = _PAGE_MARKER_RE.sub("", content, count=1)
         body = body.replace('src="../figures/', 'src="figures/')
+        # 生 JSON があれば searchable PDF に使えるので引き継ぐ (issue #70)
+        json_path = pages_dir / f"page_{n:03d}.json"
         existing.append(
             PageText(
                 page_number=n,
                 png_path=png,
                 markdown=body,
                 ocr_engine=engine_name,
+                json_path=json_path if json_path.exists() else None,
             )
         )
     return existing, to_ocr
+
+
+def _build_searchable_pdf(
+    pages: list[PageText], all_pngs: list[Path], pdf_src: Path, pdf_out: Path
+) -> None:
+    """OCR JSON を持つページだけに不可視テキスト層を重ねる (issue #70).
+
+    JSON の無いページ (PR #71 より前に OCR した既存ページなど) は無言で再 OCR せず、
+    ページ番号を列挙して警告する。元 PDF が無ければ book_dir の全 PNG から組む。"""
+    missing = [p.page_number for p in pages if p.json_path is None]
+    if missing:
+        typer.echo(
+            f"[警告] OCR JSON が無いのでテキスト層を付けられないページ: {missing}"
+            " (再 OCR すると付きます)",
+            err=True,
+        )
+    page_jsons = {
+        p.page_number: (p.json_path, p.png_path) for p in pages if p.json_path is not None
+    }
+    if pdf_src.exists():
+        overlay_text_layer(pdf_src, pdf_out, page_jsons)
+        return
+    typer.echo(f"[情報] {pdf_src} が無いので PNG から画像 PDF を組みます", err=True)
+    tmp = pdf_out.with_name(pdf_out.name + ".tmp")
+    try:
+        build_image_pdf(all_pngs, tmp)
+        overlay_text_layer(tmp, pdf_out, page_jsons)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def _merge_pages(existing: list[PageText], new: list[PageText]) -> list[PageText]:

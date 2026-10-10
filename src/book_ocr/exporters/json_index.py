@@ -29,6 +29,8 @@ def render_index(meta: BookMetadata, pages: list[PageText]) -> dict[str, Any]:
         result["ocr_settings"] = meta.ocr_settings
     if meta.ocr_runtime is not None:
         result["ocr_runtime"] = meta.ocr_runtime
+    if meta.searchable_pdf is not None:
+        result["searchable_pdf"] = meta.searchable_pdf
     result["pages"] = [_render_page_entry(p) for p in pages]
     return result
 

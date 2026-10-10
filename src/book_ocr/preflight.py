@@ -62,13 +62,15 @@ def check_disk_space(
     chunk_size: int | None,
     tempdir: Path | None = None,
     disk_usage_fn: Callable[[Path], shutil._ntuple_diskusage] = shutil.disk_usage,
+    extra_bytes: int = 0,
 ) -> None:
     """out_dir と tempdir 双方のマウントで残量チェック。不足なら PreflightError.
 
     tempdir を省略時は `tempfile.gettempdir()` を使う。同一マウントなら
-    重複チェックは省略する (st_dev で判定)。
+    重複チェックは省略する (st_dev で判定)。`extra_bytes` は OCR 以外の成果物
+    (searchable PDF など) の分を上乗せする (issue #70)。
     """
-    required = estimate_required_bytes(pngs, chunk_size)
+    required = estimate_required_bytes(pngs, chunk_size) + extra_bytes
     if required == 0:
         return
 

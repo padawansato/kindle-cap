@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pymupdf
 import pytest
 import typer
+from PIL import Image
 from typer.testing import CliRunner
 
 from book_ocr import cli
 from book_ocr.cli import _partition_existing_pages, run_ocr_pipeline
+from book_ocr.exporters.searchable_pdf import build_image_pdf
 from book_ocr.models import PageText
 
 
@@ -506,3 +510,115 @@ class TestIndexMetadataExtension:
         data = json.loads((book / "index.json").read_text(encoding="utf-8"))
         runtime = data["ocr_runtime"]
         assert runtime["started_at"] <= runtime["finished_at"]
+
+
+class TestSearchablePdfOption:
+    """issue #70: --searchable-pdf で OCR JSON からコピー・検索できる PDF を作る。"""
+
+    class JsonEngine(FakeEngine):
+        """yomitoku と同様に pages/page_NNN.json を書き、PageText.json_path で指す。"""
+
+        def __init__(self, pages_dir: Path) -> None:
+            self.pages_dir = pages_dir
+
+        def run_batch(self, pngs: list[Path]) -> list[PageText]:
+            self.pages_dir.mkdir(parents=True, exist_ok=True)
+            pages = []
+            for p in super().run_batch(pngs):
+                json_path = self.pages_dir / f"page_{p.page_number:03d}.json"
+                json_path.write_text(_page_json(f"ページ{p.page_number}の本文"), encoding="utf-8")
+                pages.append(replace(p, json_path=json_path))
+            return pages
+
+    def _book_with_real_pngs(self, tmp_path: Path, n_pages: int, size=(800, 600)) -> Path:
+        book = tmp_path / "my-book"
+        book.mkdir()
+        for i in range(1, n_pages + 1):
+            Image.new("RGB", size, "white").save(book / f"page_{i:03d}.png")
+        return book
+
+    def test_cli_flag_builds_pdf_from_pngs_when_kindle_cap_pdf_is_absent(
+        self, tmp_path: Path
+    ) -> None:
+        app = typer.Typer()
+        app.command()(cli.ocr)
+        book = self._book_with_real_pngs(tmp_path, n_pages=2)
+        with patch("book_ocr.cli.YomiTokuEngine", return_value=self.JsonEngine(book / "pages")):
+            result = CliRunner().invoke(app, [str(book), "--searchable-pdf"])
+        assert result.exit_code == 0, result.output
+
+        pdf = book / "my-book.searchable.pdf"
+        doc = pymupdf.open(pdf)
+        assert [p.get_text().strip() for p in doc] == ["ページ1の本文", "ページ2の本文"]
+        index = json.loads((book / "index.json").read_text(encoding="utf-8"))
+        assert index["searchable_pdf"] == "my-book.searchable.pdf"
+        assert "my-book.searchable.pdf" in result.output
+
+    def test_overlays_onto_existing_kindle_cap_pdf_instead_of_rebuilding(
+        self, tmp_path: Path
+    ) -> None:
+        """output/<book>.pdf があればそれに層を重ねる (画像の再エンコードなし)。
+        元 PDF を別サイズで作っておき、出力がそのページ寸法を引き継ぐことで見分ける。"""
+        book = self._book_with_real_pngs(tmp_path, n_pages=2)
+        small = tmp_path / "small"
+        small.mkdir()
+        for i in (1, 2):
+            Image.new("RGB", (400, 300), "white").save(small / f"page_{i:03d}.png")
+        build_image_pdf(sorted(small.glob("*.png")), tmp_path / "my-book.pdf")
+
+        run_ocr_pipeline(book_dir=book, engine=self.JsonEngine(book / "pages"), searchable_pdf=True)
+
+        doc = pymupdf.open(book / "my-book.searchable.pdf")
+        assert doc[0].rect.width == 400 * 0.75
+        assert [p.get_text().strip() for p in doc] == ["ページ1の本文", "ページ2の本文"]
+
+    def test_skip_existing_reuses_json_and_warns_for_pages_without_it(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """再 OCR なしで PDF だけ作り直せる。JSON の無い既存ページは無言で再 OCR せず、
+        ページ番号を列挙して警告する。"""
+        book = self._book_with_real_pngs(tmp_path, n_pages=3)
+        pages_dir = book / "pages"
+        pages_dir.mkdir()
+        for n in (1, 2):
+            (pages_dir / f"page_{n:03d}.md").write_text(
+                f"<!-- page:{n:03d} -->\n\n旧{n}", encoding="utf-8"
+            )
+        (pages_dir / "page_002.json").write_text(_page_json("既存2の本文"), encoding="utf-8")
+
+        seen: list[Path] = []
+
+        class Capturing(self.JsonEngine):
+            def run_batch(self, pngs: list[Path]) -> list[PageText]:
+                seen.extend(pngs)
+                return super().run_batch(pngs)
+
+        run_ocr_pipeline(
+            book_dir=book, engine=Capturing(pages_dir), skip_existing=True, searchable_pdf=True
+        )
+
+        assert [p.name for p in seen] == ["page_003.png"]
+        doc = pymupdf.open(book / "my-book.searchable.pdf")
+        assert [p.get_text().strip() for p in doc] == ["", "既存2の本文", "ページ3の本文"]
+        assert "[1]" in capsys.readouterr().err
+        index = json.loads((book / "index.json").read_text(encoding="utf-8"))
+        assert [("json" in p) for p in index["pages"]] == [False, True, True]
+
+
+def _page_json(text: str) -> str:
+    """yomitoku `-f json` 互換の最小ページ (横書き 1 語)。"""
+    return json.dumps(
+        {
+            "paragraphs": [{"box": [40, 40, 760, 100], "order": 0}],
+            "figures": [],
+            "tables": [],
+            "words": [
+                {
+                    "content": text,
+                    "direction": "horizontal",
+                    "points": [[40, 40], [760, 40], [760, 100], [40, 100]],
+                }
+            ],
+        },
+        ensure_ascii=False,
+    )
