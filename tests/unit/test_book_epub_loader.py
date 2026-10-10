@@ -86,3 +86,42 @@ class TestLoadBook:
         source, warnings = load_book(book_dir)
         assert [p.page_number for p in source.pages] == [1, 2]
         assert any("page_backup.md" in w for w in warnings)
+
+
+# ---------------------------------------------------------------------------
+# --skip-pages (issue #68): 原本の目次ページなど OCR ノイズの多いページを EPUB から外す
+# ---------------------------------------------------------------------------
+
+
+class TestSkipPages:
+    @pytest.mark.parametrize(
+        ("spec", "expected"),
+        [
+            ("2", {2}),
+            ("4-6,9", {4, 5, 6, 9}),
+            (" 1 , 3-3 ", {1, 3}),
+            ("", set()),
+        ],
+    )
+    def test_parse_page_spec(self, spec: str, expected: set[int]) -> None:
+        from book_epub.loader import parse_page_spec
+
+        assert parse_page_spec(spec) == frozenset(expected)
+
+    @pytest.mark.parametrize("bad", ["0", "a", "5-2", "1-", "-3"])
+    def test_parse_page_spec_rejects_invalid(self, bad: str) -> None:
+        from book_epub.loader import parse_page_spec
+
+        with pytest.raises(ValueError):
+            parse_page_spec(bad)
+
+    def test_skipped_pages_are_dropped_and_missing_ones_warn(self, tmp_path: Path) -> None:
+        book_dir = _make_book_dir(tmp_path)
+        source, warnings = load_book(book_dir, skip_pages=frozenset({2, 7}))
+        assert [p.page_number for p in source.pages] == [1]
+        assert any("7" in w for w in warnings)  # 存在しないページ指定は警告
+
+    def test_skipping_every_page_raises(self, tmp_path: Path) -> None:
+        book_dir = _make_book_dir(tmp_path)
+        with pytest.raises(ValueError):
+            load_book(book_dir, skip_pages=frozenset({1, 2}))

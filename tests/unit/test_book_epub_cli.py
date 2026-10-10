@@ -70,3 +70,26 @@ class TestCliInvocation:
         result = runner.invoke(app, [str(book_dir)])
         assert result.exit_code == 0
         assert "EPUB complete:" in result.stdout
+
+
+def test_cli_skip_pages_is_applied_and_invalid_spec_exits_nonzero(tmp_path: Path) -> None:
+    book_dir = _make_book_dir(tmp_path)
+    (book_dir / "pages" / "page_002.md").write_text(
+        "<!-- page:002 -->\n\n目次 000", encoding="utf-8"
+    )
+    dest = tmp_path / "skip.epub"
+    result = runner.invoke(app, [str(book_dir), "--skip-pages", "2", "--out", str(dest)])
+    assert result.exit_code == 0, result.output
+    assert dest.exists()
+    from ebooklib import epub
+
+    book = epub.read_epub(str(dest))
+    bodies = [
+        item.get_content().decode("utf-8")
+        for item in book.get_items()
+        if item.get_type() == 9  # ITEM_DOCUMENT
+    ]
+    assert not any("目次 000" in b for b in bodies)
+
+    result = runner.invoke(app, [str(book_dir), "--skip-pages", "x"])
+    assert result.exit_code != 0

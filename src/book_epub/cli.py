@@ -8,7 +8,7 @@ import typer
 from ebooklib import epub
 
 from book_epub.builder import build_epub
-from book_epub.loader import load_book
+from book_epub.loader import load_book, parse_page_spec
 
 
 def _sanitize_filename(name: str) -> str:
@@ -21,9 +21,10 @@ def run_build_pipeline(
     title: str | None,
     author: str | None,
     out: Path | None,
+    skip_pages: frozenset[int] = frozenset(),
 ) -> Path:
     """book_dir から EPUB を生成し、生成ファイルのパスを返す。警告は stderr へ。"""
-    source, warnings = load_book(book_dir, title_override=title)
+    source, warnings = load_book(book_dir, title_override=title, skip_pages=skip_pages)
     book, build_warnings = build_epub(source, author=author)
     for w in [*warnings, *build_warnings]:
         typer.echo(f"[警告] {w}", err=True)
@@ -53,11 +54,25 @@ def build(
     out: Path | None = typer.Option(
         None, "--out", help="出力 EPUB パス (省略時は <book_dir>/<title>.epub)"
     ),
+    skip_pages: str = typer.Option(
+        "",
+        "--skip-pages",
+        help=(
+            "EPUB に入れないページ番号 (例: 4-9,48)。原本の目次ページなど OCR ノイズが"
+            "多く読み上げの邪魔になるページを外す (issue #68)"
+        ),
+    ),
 ) -> None:
     """book-ocr の成果物から読み上げ可能な図表入り EPUB 3 を生成する."""
     try:
-        epub_path = run_build_pipeline(book_dir, title=title, author=author, out=out)
-    except FileNotFoundError as e:
+        skip = parse_page_spec(skip_pages)
+    except ValueError as e:
+        raise typer.BadParameter(str(e), param_hint="--skip-pages") from e
+    try:
+        epub_path = run_build_pipeline(
+            book_dir, title=title, author=author, out=out, skip_pages=skip
+        )
+    except (FileNotFoundError, ValueError) as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1) from e
     typer.echo(f"EPUB complete: {epub_path}")

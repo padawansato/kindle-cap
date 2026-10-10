@@ -26,13 +26,46 @@ class BookSource:
     cover_png: Path | None
 
 
-def load_book(book_dir: Path, title_override: str | None = None) -> tuple[BookSource, list[str]]:
+_PAGE_RANGE_RE = re.compile(r"^(\d+)(?:-(\d+))?$")
+
+
+def parse_page_spec(spec: str) -> frozenset[int]:
+    """`"4-9,48"` のようなページ指定を 1 始まりのページ番号集合にする (issue #68)。
+
+    Raises:
+        ValueError: 数字でない、0 以下、範囲が逆 (`5-2`) など。
+    """
+    pages: set[int] = set()
+    for raw in spec.split(","):
+        token = raw.strip()
+        if not token:
+            continue
+        m = _PAGE_RANGE_RE.match(token)
+        if m is None:
+            raise ValueError(f"ページ指定を解釈できません: {token!r} (例: 4-9,48)")
+        start = int(m.group(1))
+        end = int(m.group(2)) if m.group(2) is not None else start
+        if start < 1 or end < start:
+            raise ValueError(f"ページ指定が不正です: {token!r} (1 以上で、範囲は小さい順)")
+        pages.update(range(start, end + 1))
+    return frozenset(pages)
+
+
+def load_book(
+    book_dir: Path,
+    title_override: str | None = None,
+    skip_pages: frozenset[int] = frozenset(),
+) -> tuple[BookSource, list[str]]:
     """book_dir から pages md / title / figures / cover を読み込む。
+
+    `skip_pages` のページ番号は EPUB に入れない (原本の目次ページなど、OCR ノイズが
+    多く読み上げの邪魔になるページを外す用。issue #68)。
 
     Returns:
         (BookSource, 警告メッセージのリスト)。致命的でない欠落は警告に落とす。
     Raises:
         FileNotFoundError: pages/ が無い、または page md が 1 枚も無い場合。
+        ValueError: skip_pages で全ページを外してしまった場合。
     """
     warnings: list[str] = []
 
@@ -62,6 +95,17 @@ def load_book(book_dir: Path, title_override: str | None = None) -> tuple[BookSo
             )
         )
     pages.sort(key=lambda page: page.page_number)
+
+    if skip_pages:
+        present = {page.page_number for page in pages}
+        missing = sorted(skip_pages - present)
+        if missing:
+            warnings.append(
+                "--skip-pages に存在しないページがあります: " + ", ".join(str(n) for n in missing)
+            )
+        pages = [page for page in pages if page.page_number not in skip_pages]
+        if not pages:
+            raise ValueError("--skip-pages で全ページを外してしまいました")
 
     title = title_override or _read_title(book_dir, warnings) or book_dir.name
 

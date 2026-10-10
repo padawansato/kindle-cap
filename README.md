@@ -248,6 +248,7 @@ uv run book-epub output/my-book/ --title "正式な書名" --author "著者名"
 | `--title TEXT` | index.json の title → ディレクトリ名 | 書名 |
 | `--author TEXT` | なし | 著者名 (EPUB メタデータ) |
 | `--out PATH` | `<book_dir>/<title>.epub` | 出力先 |
+| `--skip-pages SPEC` | なし | EPUB に入れないページ番号（例: `4-9,48`）。原本の目次ページなど OCR ノイズが多く読み上げの邪魔になるページを外す (issue #68) |
 
 - 図表は本文の流れの中に埋め込まれ、`--figure_letter` で抽出した図中テキストは
   読み上げ対象の本文として図の近くに配置される
