@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 import re
 
+from book_epub.converter import is_dropped_paragraph
 from book_epub.loader import SourcePage
 
 _BLOCK_SEP_RE = re.compile(r"\n[ \t]*\n+")
@@ -22,8 +23,14 @@ _TERMINATORS = frozenset("。．.！!？?」』）)】")
 _NEW_PARAGRAPH_STARTS = frozenset("　 ○●◎◇◆□■▶▷・※「『（(【［[〈《")
 
 
-def join_cross_page_sentences(pages: list[SourcePage]) -> list[SourcePage]:
+def join_cross_page_sentences(
+    pages: list[SourcePage], title: str | None = None
+) -> list[SourcePage]:
     """連続するページ N, N+1 の組ごとに、N の最後の段落と N+1 の最初の段落を連結する。
+
+    EPUB 変換時に落とされるブロック (ノンブル・`title` と一致する柱・1 文字段落。
+    `converter.is_dropped_paragraph`) は飛ばし、その内側の段落同士を境界とみなす。
+    飛ばしたブロックはその場に残す (どのみち変換時に落ちる)。
 
     結合するのは、N の最後のブロックが終端記号で終わらない通常の段落で、N+1 の
     最初のブロックが字下げ・箇条書き記号・開き括弧で始まらない通常の段落のときだけ。
@@ -37,9 +44,11 @@ def join_cross_page_sentences(pages: list[SourcePage]) -> list[SourcePage]:
         if pages[i + 1].page_number != pages[i].page_number + 1:
             continue
         prev, nxt = blocks[i], blocks[i + 1]
-        if not prev or not nxt or not _can_join(prev[-1], nxt[0]):
+        tail = _last_kept_index(prev, title)
+        head = _first_kept_index(nxt, title)
+        if tail is None or head is None or not _can_join(prev[tail], nxt[head]):
             continue
-        prev[-1] = _concat(prev[-1], nxt.pop(0))
+        prev[tail] = _concat(prev[tail], nxt.pop(head))
         changed[i] = changed[i + 1] = True
 
     return [
@@ -52,15 +61,26 @@ def _split_blocks(markdown: str) -> list[str]:
     return [b for b in _BLOCK_SEP_RE.split(markdown.strip("\n")) if b.strip()]
 
 
+def _last_kept_index(blocks: list[str], title: str | None) -> int | None:
+    for i in range(len(blocks) - 1, -1, -1):
+        if not is_dropped_paragraph(blocks[i], title):
+            return i
+    return None
+
+
+def _first_kept_index(blocks: list[str], title: str | None) -> int | None:
+    for i, block in enumerate(blocks):
+        if not is_dropped_paragraph(block, title):
+            return i
+    return None
+
+
 def _is_plain_paragraph(block: str) -> bool:
     return not any(_NON_PARAGRAPH_LINE_RE.match(line.lstrip(" ")) for line in block.splitlines())
 
 
 def _can_join(tail_block: str, head_block: str) -> bool:
     tail = tail_block.rstrip()
-    # 1 文字だけのブロックは装飾見出しの断片 (converter が落とす対象) なので結合しない
-    if len(tail.strip()) <= 1 or len(head_block.strip()) <= 1:
-        return False
     if _NOMBRE_RE.match(tail) or _NOMBRE_RE.match(head_block):
         return False
     if not (_is_plain_paragraph(tail) and _is_plain_paragraph(head_block)):

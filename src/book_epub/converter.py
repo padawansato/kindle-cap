@@ -81,11 +81,23 @@ def md_to_xhtml_body(markdown_text: str, title: str | None = None) -> str:
     1 文字だけの段落も落とす (issue #68)。読み上げの邪魔になるノンブル（2〜4 桁の
     数字だけの段落）と、`title` と一致する柱の段落も落とす。
     """
-    text = _strip_forced_linebreaks(markdown_text)
-    text = _drop_title_paragraphs(
+    text = _drop_noise_paragraphs(_strip_forced_linebreaks(markdown_text), title)
+    return str(md_lib.markdown(text, extensions=["tables"]))
+
+
+def _drop_noise_paragraphs(text: str, title: str | None) -> str:
+    return _drop_title_paragraphs(
         _drop_page_number_paragraphs(_drop_single_char_paragraphs(text)), title
     )
-    return str(md_lib.markdown(text, extensions=["tables"]))
+
+
+def is_dropped_paragraph(block: str, title: str | None = None) -> bool:
+    """空行区切りの 1 ブロックが md_to_xhtml_body で丸ごと落とされるかを返す。
+
+    ページ間の文の再結合 (page_join) が、変換時に消えるノンブル・柱・1 文字段落を
+    飛ばして実質の段落境界を探すのに使う。判定は md_to_xhtml_body と同じ処理で行う。
+    """
+    return not _drop_noise_paragraphs(_strip_forced_linebreaks(block) + "\n", title).strip()
 
 
 def normalize_figure_srcs(html: str) -> str:

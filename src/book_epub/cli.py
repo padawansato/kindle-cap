@@ -33,7 +33,9 @@ def run_build_pipeline(
     """
     source, warnings = load_book(book_dir, title_override=title, skip_pages=skip_pages)
     if join_pages:
-        source = dataclasses.replace(source, pages=join_cross_page_sentences(source.pages))
+        source = dataclasses.replace(
+            source, pages=join_cross_page_sentences(source.pages, title=source.title)
+        )
     book, build_warnings = build_epub(source, author=author)
     for w in [*warnings, *build_warnings]:
         typer.echo(f"[警告] {w}", err=True)

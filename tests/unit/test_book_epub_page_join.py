@@ -49,12 +49,12 @@ def test_not_joined_when_previous_ends_with_terminator_or_next_is_not_plain() ->
         ("## 見出しで終わる", "本文"),
         ("- リストで終わる", "本文"),
         ('<img src="../figures/page_001_figure_0.png" alt="図">', "本文"),
-        # 1 文字だけのブロックは縦書き装飾見出しの断片 (converter が落とす) なので結合しない
+        # 変換時に落ちる 1 文字段落しか無いページは結合相手にならない
         ("決", "法を見直す"),
         ("途中の文", "法"),
         # 数字と記号だけのブロックはノンブル (ページ番号) なので本文と連結しない
-        ("運動が継続しない人は、「疲れ\n\n134", "ているから明日から」"),
         ("途中の文", "– 12 –"),
+        ("12345", "続き"),
         ("途中の文", ""),
         ("", "本文"),
     ]
@@ -90,3 +90,19 @@ def test_join_happens_once_per_pair_without_chaining() -> None:
         "",
         "三ページ目の頭。",
     ]
+
+
+def test_blocks_dropped_by_converter_are_skipped_to_find_the_real_boundary() -> None:
+    # ノンブル・書名の柱・1 文字段落は EPUB 変換時に落とされる (converter)。
+    # それらを飛ばした実質の末尾段落と先頭段落を結合し、飛ばしたブロックはその場に残す
+    pages = _pages(
+        "運動が継続しない人は、「疲れ\n\n134\n\n体調管理の本",
+        "体調管理の本\n\n法\n\nているから明日から」と先延ばしにする。\n\n次の段落。",
+    )
+    assert _texts(join_cross_page_sentences(pages, title="体調管理の本")) == [
+        "運動が継続しない人は、「疲れているから明日から」と先延ばしにする。\n\n134\n\n体調管理の本",
+        "体調管理の本\n\n法\n\n次の段落。",
+    ]
+    # title を渡さなければ柱は普通の段落として扱われ、終端記号が無くても柱同士は結合する。
+    # それを避けるため CLI は書名を渡す
+    assert _texts(join_cross_page_sentences(pages))[1].startswith("法")
