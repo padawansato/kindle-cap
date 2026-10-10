@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .library import Book, safe_name
+from .reader import Status
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,14 @@ def run_all(
     open_book: Callable[[Book], None],
     close_book: Callable[[], None],
     capture_book: Callable[[Book, str], None],
+    save_position: Callable[[], Status | None] | None = None,
+    restore_position: Callable[[Status | None], None] | None = None,
 ) -> list[BookResult]:
+    """選ばれた本を順に open → (位置記録) → capture → (位置復元) → close する.
+
+    `save_position` / `restore_position` を渡すと、開いた直後の読書位置を記録し、
+    撮影の後 (撮影が失敗しても) close の前に戻す。復元の失敗は警告にとどめ、
+    撮影結果は失わない。"""
     results: list[BookResult] = []
     done = 0
     for book, name, reason in select_books(books, out=out, include_pdf=include_pdf, only=only):
@@ -82,7 +90,12 @@ def run_all(
         try:
             open_book(book)
             try:
-                capture_book(book, name)
+                saved = save_position() if save_position is not None else None
+                try:
+                    capture_book(book, name)
+                finally:
+                    if restore_position is not None:
+                        _restore_quietly(restore_position, saved, book)
             finally:
                 close_book()
         except Exception as e:
@@ -91,3 +104,12 @@ def run_all(
             continue
         results.append(BookResult(book, name, "captured"))
     return results
+
+
+def _restore_quietly(
+    restore_position: Callable[[Status | None], None], saved: Status | None, book: Book
+) -> None:
+    try:
+        restore_position(saved)
+    except Exception as e:
+        logger.warning("読書位置を戻せませんでした (撮影結果は残します): %s: %s", book.title, e)

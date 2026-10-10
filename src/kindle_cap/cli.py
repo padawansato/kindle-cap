@@ -320,6 +320,15 @@ def capture_all(
             "先頭に戻す工程だけ一瞬前面に出る。--foreground は従来どおり (issue #84)"
         ),
     ),
+    restore_position: bool = typer.Option(
+        True,
+        "--restore-position/--no-restore-position",
+        help=(
+            "--restore-position (既定): 本を開いた直後の読書位置を記録し、撮影後に"
+            "「次の位置No.に移動」で元の位置へ戻してから閉じる。位置が読めない (表紙) "
+            "本は先頭のまま"
+        ),
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="DEBUG レベルログを有効化"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="WARNING 以上のみ出力"),
     log_file: Path | None = typer.Option(
@@ -329,14 +338,16 @@ def capture_all(
     """Kindle.app のライブラリにある書籍を順に開き、先頭に戻して全ページ撮影 → PDF にする.
 
     本を手で選んで 1 ページ目を開く準備は不要。既に `<out>/<書籍名>.pdf` がある本は
-    飛ばすので、中断しても再実行で続きから進む。撮影した本の読書位置は末尾に移る。
+    飛ばすので、中断しても再実行で続きから進む。撮影した本の読書位置は、既定で
+    撮影前の位置に戻す (`--no-restore-position` なら末尾に移ったまま)。
     サンプル本は書籍情報シートが割り込むなど挙動が違うので対象外。
     """
     _setup_logging(verbose=verbose, quiet=quiet, log_file=log_file)
     # PyObjC (アクセシビリティ API) はこのコマンドでしか使わないので遅延 import
     from . import ax, library
     from .background import post_key
-    from .reader import parse_status, rewind_to_start
+    from .reader import Status, parse_status, rewind_to_start
+    from .reader import restore_position as restore_reading_position
     from .window import get_window_geometry
 
     try:
@@ -438,6 +449,25 @@ def capture_all(
                 f"{n_pages} ページしか撮れていません (ページ送りが効いていない可能性)。PDF は削除しました"
             )
 
+    def front_status() -> Status | None:
+        # read_status の chrome 出し (マウス) と Escape (osascript) は Kindle が前面のときしか
+        # 効かない。背面撮影の後はユーザーの別アプリが前面にいることがある (issue #84)
+        ax.activate()
+        sleep(0.3)
+        return read_status()
+
+    def save_position() -> Status | None:
+        saved = front_status()
+        logger.info("撮影前の読書位置: %s", saved)
+        return saved
+
+    def restore(saved: Status | None) -> None:
+        restore_reading_position(
+            saved,
+            goto=lambda n: library.goto_location(app, n, geometry=geometry()),
+            read_status=front_status,
+        )
+
     results = run_all(
         books,
         out=out,
@@ -447,6 +477,8 @@ def capture_all(
         open_book=lambda b: library.open_book(app, b),
         close_book=lambda: library.close_book(app, geometry=geometry()),
         capture_book=capture_book,
+        save_position=save_position if restore_position else None,
+        restore_position=restore if restore_position else None,
     )
     captured = [r for r in results if r.status == "captured"]
     failed = [r for r in results if r.status == "failed"]

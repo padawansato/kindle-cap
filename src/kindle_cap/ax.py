@@ -8,6 +8,8 @@ callable として受け取るので、テストでは偽物に差し替えら�
   `AXUIElementCopyAttributeValue` を直接呼べば 0.07 秒。
 - リーダーのツールバー (chrome) はマウスを掃くと出て、Escape で隠れる。
 - Cmd+W はアプリごと終了するので使わない。
+- 任意の位置へは chrome の「その他のオプション」→「次の位置No.に移動:」で
+  ダイアログを出し、「位置No.」の AXTextField に AXValue を入れて「移動」を押す。
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from ApplicationServices import (
     AXUIElementCopyAttributeValue,
     AXUIElementCreateApplication,
     AXUIElementPerformAction,
+    AXUIElementSetAttributeValue,
     AXValueGetValue,
     kAXChildrenAttribute,
     kAXDescriptionAttribute,
@@ -81,6 +84,13 @@ def perform(el: AXElement, action: str) -> None:
     err = AXUIElementPerformAction(el, action)
     if err != 0:
         raise KindleAXError(f"AX action {action} failed (err={err})")
+
+
+def set_value(el: AXElement, text: str) -> None:
+    """テキストフィールドに値を入れる (Kindle の「位置No.」欄は AXValue の直接設定が効く、実測)."""
+    err = AXUIElementSetAttributeValue(el, kAXValueAttribute, text)
+    if err != 0:
+        raise KindleAXError(f"AX set value failed (err={err})")
 
 
 def find(app: AXElement, role: str, pred: Callable[[str], bool]) -> list[AXElement]:

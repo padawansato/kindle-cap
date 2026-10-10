@@ -37,6 +37,14 @@ _CLOSE_SHEET = "閉じる"  # 書籍情報シート (サンプルを開くと出
 # ハンドルも「閉じる」と名乗るが AXPress は効かず、Escape で消える (issue #86)
 _SYNC_SHEET_RE = re.compile(r"最新の位置に移動|位置\s*\d+に戻る")
 _KEY_ESCAPE = 53
+# リーダーの任意位置への移動 (chrome「その他のオプション」→「次の位置No.に移動:」→
+# 「位置No.」欄 + 「移動」)。実測は位置番号の本のみ。固定ページの本では項目名が
+# 違う可能性があるので「…に移動」で探す
+_MORE_OPTIONS = "その他のオプション"
+_CLOSE_MENU = "メニューを閉じる"
+_GOTO_MENU_SUFFIX = "に移動"
+_GOTO_CONFIRM = "移動"
+_GOTO_CANCEL = "キャンセル"
 _MAX_NAME_LEN = 80
 
 
@@ -292,3 +300,50 @@ def close_book(app: ax.AXElement, *, geometry: tuple[int, int, int, int]) -> Non
             return
     if in_reader(app):
         raise RuntimeError("「本を閉じる」ボタンが見つかりません")
+
+
+def goto_location(app: ax.AXElement, number: int, *, geometry: tuple[int, int, int, int]) -> None:
+    """リーダーで位置番号 `number` へ移動する.
+
+    chrome の「その他のオプション」を押すと右にメニューが出て、そこの
+    「次の位置No.に移動:」で「位置No. (1 ～ N) を入力してください。」ダイアログが出る。
+    「位置No.」の AXTextField に AXValue で番号を入れ、「移動」を押す (実測、Kindle 7.68)。
+    ダイアログが残ったら (範囲外など) 「キャンセル」で閉じて例外にする。"""
+    ax.activate()
+    time.sleep(0.3)
+    dismiss_sheet(app)
+    more: list[ax.AXElement] = []
+    for _ in range(3):
+        ax.sweep_mouse(*geometry)
+        more = ax.find(app, "AXButton", lambda d: d == _MORE_OPTIONS)
+        if more:
+            break
+    if not more:
+        raise RuntimeError(f"「{_MORE_OPTIONS}」ボタンが見つかりません")
+    ax.perform(more[0], "AXPress")
+    time.sleep(1.0)
+    items = ax.find(app, "AXButton", lambda d: d.rstrip(":：").endswith(_GOTO_MENU_SUFFIX))
+    if not items:
+        close = ax.find(app, "AXButton", lambda d: d == _CLOSE_MENU)
+        if close:
+            ax.perform(close[0], "AXPress")
+        raise RuntimeError("「次の位置No.に移動」がメニューにありません")
+    logger.debug("移動メニュー: %s", ax.description(items[0]))
+    ax.perform(items[0], "AXPress")
+    time.sleep(1.0)
+    fields = ax.find(app, "AXTextField", lambda _d: True)
+    if not fields:
+        raise RuntimeError("位置の入力欄が見つかりません")
+    ax.set_value(fields[0], str(number))
+    time.sleep(0.3)
+    confirm = ax.find(app, "AXButton", lambda d: d == _GOTO_CONFIRM)
+    if not confirm:
+        raise RuntimeError(f"「{_GOTO_CONFIRM}」ボタンが見つかりません")
+    ax.perform(confirm[0], "AXPress")
+    time.sleep(1.5)
+    if ax.find(app, "AXTextField", lambda _d: True):
+        cancel = ax.find(app, "AXButton", lambda d: d == _GOTO_CANCEL)
+        if cancel:
+            ax.perform(cancel[0], "AXPress")
+        raise RuntimeError(f"位置 {number} へ移動できません (ダイアログが閉じない)")
+    ax.park_mouse(*geometry)
