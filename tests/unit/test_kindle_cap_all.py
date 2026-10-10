@@ -216,3 +216,49 @@ def test_run_all_continues_after_a_failure_and_always_closes_the_book(tmp_path: 
         "close",
     ]
     assert isinstance(results[0], BookResult)
+
+
+# ---------------------------------------------------------------------------
+# dismiss_sheet (issue #86): 読書位置の同期シートは Escape で、書籍情報シートは AXPress で閉じる
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("buttons", "expect_escape", "expect_press", "expect_result"),
+    [
+        # 同期シート: ハンドル「閉じる」+「最新の位置に移動」。AXPress は効かず Escape で消える
+        (["閉じる", "最新の位置に移動"], True, False, True),
+        (["閉じる", "位置182に戻る"], True, False, True),
+        # 書籍情報シート (サンプル): 従来どおり「閉じる」を AXPress
+        (["閉じる", "シェア"], False, True, True),
+        ([], False, False, False),
+    ],
+)
+def test_dismiss_sheet_uses_escape_for_sync_sheet_and_press_for_info_sheet(
+    monkeypatch: pytest.MonkeyPatch,
+    buttons: list[str],
+    expect_escape: bool,
+    expect_press: bool,
+    expect_result: bool,
+) -> None:
+    from kindle_cap import library
+
+    class FakeEl:
+        def __init__(self, desc: str) -> None:
+            self.desc = desc
+
+    def fake_find(app: object, role: str, pred: object) -> list[FakeEl]:
+        assert role == "AXButton"
+        return [FakeEl(d) for d in buttons if pred(d)]  # type: ignore[operator]
+
+    pressed: list[str] = []
+    keys: list[int] = []
+    monkeypatch.setattr(library.ax, "find", fake_find)
+    monkeypatch.setattr(library.ax, "description", lambda el: el.desc)
+    monkeypatch.setattr(library.ax, "perform", lambda el, action: pressed.append(el.desc))
+    monkeypatch.setattr(library, "post_key", lambda code: keys.append(code))
+    monkeypatch.setattr(library.time, "sleep", lambda s: None)
+
+    assert library.dismiss_sheet(object()) is expect_result
+    assert (keys == [53]) is expect_escape
+    assert (pressed == ["閉じる"]) is expect_press
