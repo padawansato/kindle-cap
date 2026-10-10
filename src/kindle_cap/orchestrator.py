@@ -4,6 +4,7 @@ import contextlib
 import dataclasses
 import hashlib
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from time import sleep
 
@@ -27,7 +28,11 @@ def run(
     dry_run: bool = False,
     auto_stop: bool = False,
     auto_direction: bool = False,
+    before_capture: Callable[[], None] | None = None,
 ) -> None:
+    """`before_capture` は各ページの撮影直前 (activate 後) に呼ぶフック。
+    kindle-cap-all がリーダーに被さるシート (サンプル末尾の「著者をフォロー」等) を
+    閉じるのに使う。"""
     preflight()
     config.out.mkdir(parents=True, exist_ok=True)
 
@@ -57,12 +62,13 @@ def run(
             auto_stop=auto_stop,
             start_index=len(initial_pngs) + 1,
             seed_hashes=seed_hashes,
+            before_capture=before_capture,
         )
         return
 
     if config.direction is None:
         raise ValueError("direction を指定してください（または auto_direction=True を使用）")
-    _capture_book(config, auto_stop=auto_stop)
+    _capture_book(config, auto_stop=auto_stop, before_capture=before_capture)
 
 
 def _image_hash(path: Path) -> str:
@@ -75,6 +81,7 @@ def _capture_book(
     auto_stop: bool,
     start_index: int = 1,
     seed_hashes: list[str] | None = None,
+    before_capture: Callable[[], None] | None = None,
 ) -> None:
     """preflight 抜きの単一書籍撮影。direction は確定済みで呼ばれる前提。
 
@@ -107,6 +114,8 @@ def _capture_book(
             logger.info("[%d/%d] capturing page", i, config.pages)
             try:
                 activate_kindle()
+                if before_capture is not None:
+                    before_capture()
                 geom = _window_geometry(config)
                 png_path = out_dir / f"page_{i:03d}.png"
                 capture_rect(geom, png_path)
