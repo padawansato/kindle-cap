@@ -12,7 +12,7 @@ macOS の Amazon Kindle アプリで表示中の書籍を、ページ送りと�
 - macOS の `screencapture` と `osascript` だけで動く（外部の DRM 解除ツール等は不要）
 - 矢印キーを送って自動でページめくり
 - ページ送り方向を `--direction rtl|ltr` で指定（rtl = 右綴じ / ltr = 左綴じ）
-- `--auto-stop` で書籍末尾を自動検出して停止（リフロー型でページ数が読めない書籍に有効）
+- 書籍末尾を自動検出して停止（ページ数の事前指定は不要。`--max-pages` は保険の上限）
 - `img2pdf` で PNG をストリーム出力で結合（1000 ページでもメモリ使用量は一定）
 - 撮影中は `[i/N] capturing page` のリアルタイム進捗表示
 
@@ -67,17 +67,13 @@ uv sync
 # 2. 撮影実行（direction を自動判定する場合）
 uv run kindle-cap \
   --name my-book \
-  --pages 600 \
   --auto-direction \
-  --auto-stop \
   --wait 1.5
 
 # 明示指定（rtl/ltr が分かっている場合）
 uv run kindle-cap \
   --name my-book \
-  --pages 600 \
   --direction rtl \
-  --auto-stop \
   --wait 1.5
 ```
 
@@ -95,7 +91,7 @@ output/my-book.pdf
 
 | オプション | 必須 | デフォルト | 説明 |
 |---|---|---|---|
-| `--pages N` | ✓ | — | 撮影ページ数の上限 |
+| `--max-pages N` | | `3000` | 1 冊あたりの撮影上限（保険）。末尾は自動検出するので通常は指定不要。上限で切れたときは警告を出す |
 | `--direction rtl\|ltr` | ※ | — | `rtl`=右綴じ（右矢印で次ページ）、`ltr`=左綴じ（左矢印で次ページ） |
 | `--auto-direction` | ※ | off | 表紙起点で direction を試写判定。**起点フレーム（表紙）は `page_001.png` として保存し**、試写は `page_002.png` 以降に流用（重複撮影なし） |
 | `--name NAME` | | （対話プロンプト） | 出力ディレクトリ名 |
@@ -103,7 +99,6 @@ output/my-book.pdf
 | `--out PATH` | | `./output` | 出力先 |
 | `--keep-png / --no-keep-png` | | `--keep-png` | 中間 PNG を保持するか |
 | `--dry-run` | | off | 1 枚だけ撮って位置確認用に保存（PDF は作らない） |
-| `--auto-stop` | | off | 連続する 2 ページが同一なら書籍末尾と判断して停止 |
 | `--pdf-jpeg-quality N` | | （未指定） | PDF 埋め込み画像を JPEG quality N (1-100) で再圧縮。未指定時は lossless PNG 埋め込み。**テキスト書籍は 80 程度推奨で PDF サイズが ~1/10 に** (issue #50) |
 | `--progress / --no-progress` | | `--no-progress` | `--pdf-jpeg-quality` 指定時の JPEG 変換ループ進捗を `tqdm` で stderr に表示。1000+ ページ書籍で「ハングしたのか」を判別できるようにする (issue #53) |
 | `--crop-top N` | | `0` | 撮影矩形の上端から N 論理ポイント削る。固定型書籍でウィンドウ左上の信号機ボタンが写り込む場合に指定。まず `--dry-run` で `output/dry_run.png` を見て値を決める（Retina でもポイント単位のまま） (issue #69) |
@@ -133,7 +128,7 @@ uv run kindle-cap-all --include-pdf
 
 - 未ダウンロードの本はその場でダウンロードしてから開く（1 冊あたり数秒〜数十秒）
 - 綴じ方向と先頭は自動判定: 前ページキーを画面が変わらなくなるまで送り、リーダーのステータス文（`N ページ中の M ページ目`）で先頭か末尾かを見分ける
-- 末尾は `--auto-stop` と同じ「同一ページが 2 回続く」で検出。`--max-pages`（既定 3000）は保険
+- 末尾は `kindle-cap` と同じ「同一ページが 2 回続く」で検出。`--max-pages`（既定 3000）は保険
 - 撮影中は Kindle.app が前面に出てキー入力を受けるので、**Mac を触らずに放置する**（`&&` で `book-ocr` を続けて放置運用するのに向く）
 - 副作用: 撮影した本の読書位置は末尾に移る（Kindle 側の「読了」扱いになる）。読みかけの本は後で位置を戻すこと
 - 飛ばすもの: サンプル本（書籍情報シートが割り込むなど挙動が違う）、`巻`（漫画などのシリーズ。**方針として対象外**で、対応予定なし）、既定では Send to Kindle した PDF
@@ -164,7 +159,7 @@ uv run kindle-cap-pdf output/my-book --pdf-jpeg-quality 80 --progress
 uv sync --extra ocr
 
 # キャプチャ → OCR を && で連結して一気に実行（推奨）
-uv run kindle-cap --name my-book --pages 200 --auto-direction \
+uv run kindle-cap --name my-book --auto-direction \
   && uv run book-ocr output/my-book/
 ```
 
@@ -260,20 +255,20 @@ uv run book-epub output/my-book/ --title "正式な書名" --author "著者名"
 ### よくある使い方
 
 ```bash
-# 短い書籍を 30 ページだけ
-uv run kindle-cap --name short-book --pages 30 --direction rtl
+# 末尾まで撮る（ページ数の指定は不要。重い書籍は --wait を増やす）
+uv run kindle-cap --name my-book --direction ltr --wait 2.0
 
-# ページ数が読めない書籍を末尾自動検出
-uv run kindle-cap --name my-book --pages 800 --direction ltr --auto-stop --wait 2.0
+# 冒頭 30 ページだけ
+uv run kindle-cap --name short-book --direction rtl --max-pages 30
 
 # 位置確認だけ（撮影しない）
-uv run kindle-cap --pages 1 --direction rtl --dry-run
+uv run kindle-cap --direction rtl --dry-run
 
 # 固定型書籍で信号機ボタンが写り込む場合、上端を削る（値は --dry-run で確認）
-uv run kindle-cap --name fixed-book --pages 300 --auto-direction --crop-top 28
+uv run kindle-cap --name fixed-book --auto-direction --crop-top 28
 
 # 撮影から AI 用 markdown 生成まで一気通貫（&& 連結で放置運用）
-uv run kindle-cap --name my-book --pages 1000 --auto-direction --pdf-jpeg-quality 80 --auto-stop \
+uv run kindle-cap --name my-book --auto-direction --pdf-jpeg-quality 80 \
   && uv run book-ocr output/my-book/
 ```
 

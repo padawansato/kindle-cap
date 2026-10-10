@@ -45,8 +45,6 @@ def test_capture_with_all_flags(mock_run: MagicMock, tmp_path: Path) -> None:
         [
             "--name",
             "test-book",
-            "--pages",
-            "3",
             "--direction",
             "rtl",
             "--out",
@@ -56,7 +54,7 @@ def test_capture_with_all_flags(mock_run: MagicMock, tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     config_arg = mock_run.call_args.args[0]
     assert config_arg.name == "test-book"
-    assert config_arg.pages == 3
+    assert config_arg.pages == 3000  # --max-pages 既定
     assert config_arg.direction.value == "rtl"
     assert config_arg.out == tmp_path
     assert config_arg.wait == 1.0
@@ -69,8 +67,6 @@ def test_capture_prompts_when_name_missing(mock_run: MagicMock, tmp_path: Path) 
     result = runner.invoke(
         app,
         [
-            "--pages",
-            "3",
             "--direction",
             "rtl",
             "--out",
@@ -91,8 +87,6 @@ def test_capture_dry_run_passed_through(mock_run: MagicMock, tmp_path: Path) -> 
         [
             "--name",
             "x",
-            "--pages",
-            "1",
             "--direction",
             "ltr",
             "--out",
@@ -105,47 +99,6 @@ def test_capture_dry_run_passed_through(mock_run: MagicMock, tmp_path: Path) -> 
 
 
 @patch("kindle_cap.cli.orchestrator_run")
-def test_capture_auto_stop_passed_through(mock_run: MagicMock, tmp_path: Path) -> None:
-    app = _make_app(capture)
-    result = runner.invoke(
-        app,
-        [
-            "--name",
-            "x",
-            "--pages",
-            "100",
-            "--direction",
-            "rtl",
-            "--out",
-            str(tmp_path),
-            "--auto-stop",
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    assert mock_run.call_args.kwargs.get("auto_stop") is True
-
-
-@patch("kindle_cap.cli.orchestrator_run")
-def test_capture_auto_stop_default_false(mock_run: MagicMock, tmp_path: Path) -> None:
-    app = _make_app(capture)
-    result = runner.invoke(
-        app,
-        [
-            "--name",
-            "x",
-            "--pages",
-            "5",
-            "--direction",
-            "rtl",
-            "--out",
-            str(tmp_path),
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    assert mock_run.call_args.kwargs.get("auto_stop") is False
-
-
-@patch("kindle_cap.cli.orchestrator_run")
 def test_capture_no_keep_png(mock_run: MagicMock, tmp_path: Path) -> None:
     app = _make_app(capture)
     result = runner.invoke(
@@ -153,8 +106,6 @@ def test_capture_no_keep_png(mock_run: MagicMock, tmp_path: Path) -> None:
         [
             "--name",
             "x",
-            "--pages",
-            "1",
             "--direction",
             "ltr",
             "--out",
@@ -206,7 +157,7 @@ def test_capture_pdf_build_error_exits_nonzero_with_message(
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+        ["--name", "x", "--direction", "rtl", "--out", str(tmp_path)],
     )
     assert result.exit_code != 0
     assert "ディスク容量不足" in result.output
@@ -243,7 +194,7 @@ def test_capture_auto_direction_routes_to_run_with_flag(
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "5", "--auto-direction", "--out", str(tmp_path)],
+        ["--name", "x", "--auto-direction", "--out", str(tmp_path)],
     )
     assert result.exit_code == 0, result.output
     assert mock_run.call_args.kwargs.get("auto_direction") is True
@@ -260,8 +211,6 @@ def test_capture_direction_and_auto_direction_conflict_exits_nonzero(
         [
             "--name",
             "x",
-            "--pages",
-            "5",
             "--direction",
             "rtl",
             "--auto-direction",
@@ -280,7 +229,7 @@ def test_capture_neither_direction_nor_auto_direction_exits_nonzero(
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "5", "--out", str(tmp_path)],
+        ["--name", "x", "--out", str(tmp_path)],
     )
     assert result.exit_code != 0
     assert "いずれか" in result.output
@@ -295,36 +244,50 @@ def test_capture_existing_direction_still_works(
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "5", "--direction", "rtl", "--out", str(tmp_path)],
+        ["--name", "x", "--direction", "rtl", "--out", str(tmp_path)],
     )
     assert result.exit_code == 0, result.output
     assert mock_run.call_args.args[0].direction is Direction.RTL
     assert mock_run.call_args.kwargs.get("auto_direction") is False
 
 
+# ---------------------------------------------------------------------------
+# ページ上限は指定不要（終端検出が常時 on、--max-pages は保険）
+# ---------------------------------------------------------------------------
+
+
 @patch("kindle_cap.cli.orchestrator_run")
-def test_capture_auto_direction_combined_with_auto_stop(
-    mock_run: MagicMock,
-    tmp_path: Path,
+def test_capture_without_max_pages_uses_ceiling_and_auto_stop(
+    mock_run: MagicMock, tmp_path: Path
 ) -> None:
-    """--auto-direction と --auto-stop を組み合わせて指定できる"""
+    """--pages 相当の指定なしで撮れる。上限は既定 3000、終端検出は常時 on"""
     app = _make_app(capture)
+    result = runner.invoke(app, ["--name", "x", "--auto-direction", "--out", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.args[0].pages == 3000
+    assert mock_run.call_args.kwargs.get("auto_stop") is True
+    assert mock_run.call_args.kwargs.get("auto_direction") is True
+
     result = runner.invoke(
-        app,
-        [
-            "--name",
-            "x",
-            "--pages",
-            "100",
-            "--auto-direction",
-            "--auto-stop",
-            "--out",
-            str(tmp_path),
-        ],
+        app, ["--name", "x", "--direction", "rtl", "--max-pages", "30", "--out", str(tmp_path)]
     )
     assert result.exit_code == 0, result.output
-    assert mock_run.call_args.kwargs.get("auto_direction") is True
+    assert mock_run.call_args.args[0].pages == 30
     assert mock_run.call_args.kwargs.get("auto_stop") is True
+
+
+@pytest.mark.parametrize("legacy_flag", [["--pages", "100"], ["--auto-stop"]])
+@patch("kindle_cap.cli.orchestrator_run")
+def test_capture_rejects_removed_flags(
+    mock_run: MagicMock, legacy_flag: list[str], tmp_path: Path
+) -> None:
+    """v0.8.0 で廃止した --pages / --auto-stop は黙って無視せずエラーにする"""
+    app = _make_app(capture)
+    result = runner.invoke(
+        app, ["--name", "x", "--direction", "rtl", "--out", str(tmp_path), *legacy_flag]
+    )
+    assert result.exit_code != 0
+    mock_run.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -337,7 +300,7 @@ def test_capture_pdf_jpeg_quality_default_is_none(mock_run: MagicMock, tmp_path:
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+        ["--name", "x", "--direction", "rtl", "--out", str(tmp_path)],
     )
     assert result.exit_code == 0, result.output
     assert mock_run.call_args.args[0].pdf_jpeg_quality is None
@@ -351,8 +314,6 @@ def test_capture_pdf_jpeg_quality_passes_through(mock_run: MagicMock, tmp_path: 
         [
             "--name",
             "x",
-            "--pages",
-            "1",
             "--direction",
             "rtl",
             "--out",
@@ -376,8 +337,6 @@ def test_capture_pdf_jpeg_quality_out_of_range_exits_nonzero(
         [
             "--name",
             "x",
-            "--pages",
-            "1",
             "--direction",
             "rtl",
             "--out",
@@ -480,7 +439,7 @@ def test_capture_default_log_level_is_info(mock_run: MagicMock, tmp_path: Path) 
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+        ["--name", "x", "--direction", "rtl", "--out", str(tmp_path)],
     )
     assert result.exit_code == 0, result.output
     assert logging.getLogger("kindle_cap").level == logging.INFO
@@ -494,8 +453,6 @@ def test_capture_verbose_sets_debug_level(mock_run: MagicMock, tmp_path: Path) -
         [
             "--name",
             "x",
-            "--pages",
-            "1",
             "--direction",
             "rtl",
             "--out",
@@ -512,7 +469,7 @@ def test_capture_verbose_short_flag(mock_run: MagicMock, tmp_path: Path) -> None
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path), "-v"],
+        ["--name", "x", "--direction", "rtl", "--out", str(tmp_path), "-v"],
     )
     assert result.exit_code == 0, result.output
     assert logging.getLogger("kindle_cap").level == logging.DEBUG
@@ -526,8 +483,6 @@ def test_capture_quiet_sets_warning_level(mock_run: MagicMock, tmp_path: Path) -
         [
             "--name",
             "x",
-            "--pages",
-            "1",
             "--direction",
             "rtl",
             "--out",
@@ -544,7 +499,7 @@ def test_capture_quiet_short_flag(mock_run: MagicMock, tmp_path: Path) -> None:
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path), "-q"],
+        ["--name", "x", "--direction", "rtl", "--out", str(tmp_path), "-q"],
     )
     assert result.exit_code == 0, result.output
     assert logging.getLogger("kindle_cap").level == logging.WARNING
@@ -560,8 +515,6 @@ def test_capture_verbose_and_quiet_conflict_exits_nonzero(
         [
             "--name",
             "x",
-            "--pages",
-            "1",
             "--direction",
             "rtl",
             "--out",
@@ -583,8 +536,6 @@ def test_capture_log_file_adds_file_handler(mock_run: MagicMock, tmp_path: Path)
         [
             "--name",
             "x",
-            "--pages",
-            "1",
             "--direction",
             "rtl",
             "--out",
@@ -662,7 +613,7 @@ def test_capture_window_geometry_error_exits_nonzero(mock_run: MagicMock, tmp_pa
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+        ["--name", "x", "--direction", "rtl", "--out", str(tmp_path)],
     )
     assert result.exit_code != 0
     assert "isn't running" in result.output
@@ -674,7 +625,7 @@ def test_capture_kindle_activation_error_exits_nonzero(mock_run: MagicMock, tmp_
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+        ["--name", "x", "--direction", "rtl", "--out", str(tmp_path)],
     )
     assert result.exit_code != 0
     assert "activate failed" in result.output
@@ -686,7 +637,7 @@ def test_capture_keystroke_error_exits_nonzero(mock_run: MagicMock, tmp_path: Pa
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+        ["--name", "x", "--direction", "rtl", "--out", str(tmp_path)],
     )
     assert result.exit_code != 0
     assert "keystroke failed" in result.output
@@ -702,7 +653,7 @@ def test_capture_crop_top_default_is_zero(mock_run: MagicMock, tmp_path: Path) -
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+        ["--name", "x", "--direction", "rtl", "--out", str(tmp_path)],
     )
     assert result.exit_code == 0, result.output
     assert mock_run.call_args.args[0].crop_top == 0
@@ -716,8 +667,6 @@ def test_capture_crop_top_passes_through(mock_run: MagicMock, tmp_path: Path) ->
         [
             "--name",
             "x",
-            "--pages",
-            "1",
             "--direction",
             "rtl",
             "--out",
@@ -738,8 +687,6 @@ def test_capture_crop_top_negative_exits_nonzero(mock_run: MagicMock, tmp_path: 
         [
             "--name",
             "x",
-            "--pages",
-            "1",
             "--direction",
             "rtl",
             "--out",
@@ -761,7 +708,7 @@ def test_capture_value_error_from_orchestrator_exits_one(
     app = _make_app(capture)
     result = runner.invoke(
         app,
-        ["--name", "x", "--pages", "1", "--direction", "rtl", "--out", str(tmp_path)],
+        ["--name", "x", "--direction", "rtl", "--out", str(tmp_path)],
     )
     assert result.exit_code == 1
     assert not isinstance(result.exception, ValueError)

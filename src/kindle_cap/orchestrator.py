@@ -103,6 +103,7 @@ def _capture_book(
             captured.append(out_dir / f"page_{i:03d}.png")
 
     last_hash: str | None = seed_hashes[-1] if seed_hashes else None
+    end_detected = False
     try:
         for i in range(start_index, config.pages + 1):
             # 試写流用時の最初の反復は、試写ループ末尾で矢印を送っていないため
@@ -134,6 +135,7 @@ def _capture_book(
                 if current_hash == last_hash:
                     png_path.unlink(missing_ok=True)
                     logger.info("終端を検出（前ページと同一）。%d ページで停止", len(captured))
+                    end_detected = True
                     break
                 last_hash = current_hash
 
@@ -152,6 +154,13 @@ def _capture_book(
     if not captured:
         logger.warning("撮影 0 ページ。%s の PDF はスキップ", config.name)
         return
+
+    if auto_stop and not end_detected:
+        # 終端で止まったのか上限で切れたのかを後から区別できるようにする
+        logger.warning(
+            "上限 %d ページに達したため停止。書籍末尾は未検出です（--max-pages を増やして再実行）",
+            config.pages,
+        )
 
     pdf_path = config.out / f"{config.name}.pdf"
     build_pdf(

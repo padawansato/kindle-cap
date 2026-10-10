@@ -965,3 +965,41 @@ def test_run_crop_top_larger_than_window_raises_value_error(
     with pytest.raises(ValueError, match="crop_top"):
         run(_config(tmp_path, pages=1, crop_top=100))
     assert not mock_cap.called
+
+
+@patch("kindle_cap.orchestrator.build_pdf")
+@patch("kindle_cap.orchestrator.send_next_page")
+@patch("kindle_cap.orchestrator.capture_rect")
+@patch("kindle_cap.orchestrator.get_window_geometry")
+@patch("kindle_cap.orchestrator.activate_kindle")
+@patch("kindle_cap.orchestrator.preflight")
+def test_run_warns_when_ceiling_reached_without_detecting_end(
+    mock_pre: MagicMock,
+    mock_act: MagicMock,
+    mock_geom: MagicMock,
+    mock_cap: MagicMock,
+    mock_send: MagicMock,
+    mock_pdf: MagicMock,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """上限で切れたのか終端で止まったのかを後から区別できるよう、上限到達時だけ警告する"""
+    mock_geom.return_value = _GEOM
+    counter = {"n": 0}
+
+    def _all_unique(geom: Geometry, path: Path) -> None:
+        counter["n"] += 1
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(f"unique-{counter['n']}".encode())
+
+    mock_cap.side_effect = _all_unique
+    with caplog.at_level(logging.WARNING, logger="kindle_cap"):
+        run(_config(tmp_path, pages=5), auto_stop=True)
+    assert any("上限 5" in r.getMessage() and "未検出" in r.getMessage() for r in caplog.records)
+    mock_pdf.assert_called_once()  # 警告しても PDF は作る
+
+    caplog.clear()
+    mock_cap.side_effect = _capture_factory_with_termination(unique_pages=3)
+    with caplog.at_level(logging.WARNING, logger="kindle_cap"):
+        run(_config(tmp_path, pages=5), auto_stop=True)
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
