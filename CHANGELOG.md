@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-11
+
 ### Added
 
 - `kindle-cap` / `kindle-cap-all --background`（既定）：撮影中に Kindle を前面に出さなくなった。`screencapture -R`（画面領域）の代わりに窓 ID 指定の `CGWindowListCreateImage`、`System Events key code`（前面アプリ宛て）の代わりに pid 宛ての `CGEventPostToPid` を使うので、Kindle の窓を他の窓の裏に置いたまま Mac で別の作業をしながら回せる。毎ページの `activate` とマウス退避も無くなった。窓を隠す（Cmd+H）・最小化する・別のデスクトップに移すと撮れないので、その間は失敗にせず警告を出して表示されるまで待つ。`kindle-cap-all` では本を開く・先頭に戻す・閉じる工程だけ従来どおり一瞬前面に出る（ライブラリの AXPress は前面でないと選択モードになるため）。従来の挙動は `--foreground`（issue #84）
@@ -146,7 +148,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/padawansato/kindle-cap/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/padawansato/kindle-cap/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/padawansato/kindle-cap/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/padawansato/kindle-cap/compare/v0.6.0...v0.6.1
