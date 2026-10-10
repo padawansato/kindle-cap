@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 
 import typer
@@ -9,6 +10,7 @@ from ebooklib import epub
 
 from book_epub.builder import build_epub
 from book_epub.loader import load_book, parse_page_spec
+from book_epub.page_join import join_cross_page_sentences
 
 
 def _sanitize_filename(name: str) -> str:
@@ -22,9 +24,18 @@ def run_build_pipeline(
     author: str | None,
     out: Path | None,
     skip_pages: frozenset[int] = frozenset(),
+    join_pages: bool = True,
 ) -> Path:
-    """book_dir から EPUB を生成し、生成ファイルのパスを返す。警告は stderr へ。"""
+    """book_dir から EPUB を生成し、生成ファイルのパスを返す。警告は stderr へ。
+
+    `join_pages` が真なら、ページ末尾で切れた文を次ページ先頭と連結してから組み立てる
+    (EPUB 側だけの加工で、pages/*.md は変更しない)。
+    """
     source, warnings = load_book(book_dir, title_override=title, skip_pages=skip_pages)
+    if join_pages:
+        source = dataclasses.replace(
+            source, pages=join_cross_page_sentences(source.pages, title=source.title)
+        )
     book, build_warnings = build_epub(source, author=author)
     for w in [*warnings, *build_warnings]:
         typer.echo(f"[警告] {w}", err=True)
@@ -62,6 +73,14 @@ def build(
             "多く読み上げの邪魔になるページを外す (issue #68)"
         ),
     ),
+    join_pages: bool = typer.Option(
+        True,
+        "--join-pages/--no-join-pages",
+        help=(
+            "ページ末尾で切れた文を次ページ先頭の段落と連結する (既定 on)。"
+            "読み上げがページ境界で途切れないようにする"
+        ),
+    ),
 ) -> None:
     """book-ocr の成果物から読み上げ可能な図表入り EPUB 3 を生成する."""
     try:
@@ -70,7 +89,12 @@ def build(
         raise typer.BadParameter(str(e), param_hint="--skip-pages") from e
     try:
         epub_path = run_build_pipeline(
-            book_dir, title=title, author=author, out=out, skip_pages=skip
+            book_dir,
+            title=title,
+            author=author,
+            out=out,
+            skip_pages=skip,
+            join_pages=join_pages,
         )
     except (FileNotFoundError, ValueError) as e:
         typer.echo(str(e), err=True)
