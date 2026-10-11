@@ -166,3 +166,64 @@ def test_page_heading_above_vertical_body_moves_to_front_of_its_half() -> None:
     ]
     left_after = [el["contents"][:3] for el in seq if el["box"][0] <= 1400 and "contents" in el]
     assert left_after == left_before
+
+
+def _horizontal_spread_with_blank_right_margin() -> dict[str, Any]:
+    """実書籍 (基盤モデルとロボットの融合 page_050) の構造: 画像幅 2940 の見開きで、
+    左ページ本文が x 244〜1428、右ページ本文が x 1515〜2697。右ページ末尾の余白で
+    要素の広がり (2697) が画像幅より狭いので、広がりから中央を求めると左ページ本文が
+    中央をまたいで見えて見開き判定が外れる (一括 OCR 5 冊の計測で判明)。"""
+
+    def para(order: int, box: list[int], text: str) -> dict[str, Any]:
+        return {
+            "box": box,
+            "contents": text,
+            "direction": "horizontal",
+            "order": order,
+            "role": None,
+        }
+
+    return {
+        "paragraphs": [
+            # yomitoku が右上 → 左上 → 左下 → 右下 と読んだとする
+            para(0, [1515, 205, 2697, 496], "右ページ上。"),
+            para(1, [244, 206, 1433, 307], "左ページ上。"),
+            para(2, [243, 1323, 1428, 1678], "左ページ下。"),
+            para(3, [1516, 1505, 2698, 1570], "右ページ下。"),
+        ],
+        "tables": [],
+        "figures": [],
+        "words": [],
+    }
+
+
+def test_spread_detection_uses_page_image_size_when_given() -> None:
+    raw = _horizontal_spread_with_blank_right_margin()
+    # 広がりから判定すると見開きに見えず、yomitoku の順のまま
+    by_extent = [p["contents"] for _, _, p in _by_order(fix_reading_order(raw, page_order="auto"))]
+    assert by_extent == ["右ページ上。", "左ページ上。", "左ページ下。", "右ページ下。"]
+    # 画像サイズを渡せば見開きと判定され、左ページを読み切ってから右ページへ
+    fixed = fix_reading_order(raw, page_order="auto", page_size=(2940, 1846))
+    assert [p["contents"] for _, _, p in _by_order(fixed)] == [
+        "左ページ上。",
+        "左ページ下。",
+        "右ページ上。",
+        "右ページ下。",
+    ]
+
+
+def test_page_image_size_reads_png_header(tmp_path: Path) -> None:
+    from book_ocr.reading_order import page_image_size
+
+    png = tmp_path / "page_001.png"
+    # 幅 2940 × 高さ 1846 の PNG ヘッダだけ (IHDR まで)。画素は要らない
+    png.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + b"\x00\x00\x00\rIHDR"
+        + (2940).to_bytes(4, "big")
+        + (1846).to_bytes(4, "big")
+    )
+    assert page_image_size(png) == (2940, 1846)
+    assert page_image_size(tmp_path / "missing.png") is None
+    (tmp_path / "not.png").write_bytes(b"GIF89a")
+    assert page_image_size(tmp_path / "not.png") is None
