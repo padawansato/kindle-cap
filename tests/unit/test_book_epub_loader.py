@@ -125,3 +125,53 @@ class TestSkipPages:
         book_dir = _make_book_dir(tmp_path)
         with pytest.raises(ValueError):
             load_book(book_dir, skip_pages=frozenset({1, 2}))
+
+
+def _png_header(width: int, height: int) -> bytes:
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + b"\x00\x00\x00\rIHDR"
+        + width.to_bytes(4, "big")
+        + height.to_bytes(4, "big")
+    )
+
+
+def _paragraph(text: str, box: list[int], direction: str) -> dict[str, object]:
+    return {"box": box, "contents": text, "direction": direction, "order": 0, "role": None}
+
+
+class TestRunningHeads:
+    def test_margin_paragraphs_repeated_on_three_pages_become_running_heads(
+        self, tmp_path: Path
+    ) -> None:
+        """柱 (#109) は md に位置が無いので pages/*.json の box で見つける。実書籍の構造:
+        縦書き本の章名の柱は小口 (左右 8% の帯) に縦書き、横書き本の柱と Kindle の窓タイトルは
+        天 (上 8% の帯)。帯の中の短い段落が 3 ページ以上で繰り返されたら、そのページの
+        柱として記録する。2 ページだけのもの、帯の外で繰り返す本文、JSON の無いページは対象外"""
+        book_dir = tmp_path / "book"
+        pages = book_dir / "pages"
+        pages.mkdir(parents=True)
+        chapter = "第1章 「睡眠の悩み」を何とかしたい!"
+        for n in (1, 2, 3, 4):
+            (pages / f"page_{n:03d}.md").write_text(
+                f"<!-- page:{n:03d} -->\n\n本文{n}", encoding="utf-8"
+            )
+            if n == 4:
+                continue  # JSON が無いページ
+            (book_dir / f"page_{n:03d}.png").write_bytes(_png_header(2940, 1846))
+            paragraphs = [
+                _paragraph(chapter, [138, 200, 168, 640], "vertical"),  # 小口 (x < 8%)
+                _paragraph("対策", [1800, 900, 1900, 960], "horizontal"),  # 帯の外で繰り返す
+                _paragraph(f"本文{n}。", [400, 400, 1400, 900], "horizontal"),
+            ]
+            if n <= 2:
+                paragraphs.append(
+                    _paragraph("Kindle", [1422, 13, 1510, 38], "horizontal")
+                )  # 2 ページだけ
+            (pages / f"page_{n:03d}.json").write_text(
+                json.dumps({"paragraphs": paragraphs, "tables": [], "figures": [], "words": []}),
+                encoding="utf-8",
+            )
+        source, _ = load_book(book_dir)
+        heads = [p.running_heads for p in source.pages]
+        assert heads == [frozenset({"第1章「睡眠の悩み」を何とかしたい!"})] * 3 + [frozenset()]

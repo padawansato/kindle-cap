@@ -182,6 +182,29 @@ class TestDropReadAloudNoise:
         html_no_title = md_to_xhtml_body(md)
         assert "なんとなく承認" in html_no_title and "<p>Kindle</p>" not in html_no_title
 
+    def test_paragraphs_listed_in_drop_texts_are_dropped_regardless_of_escaping(self) -> None:
+        """loader が JSON の box から見つけた柱 (#109) は、空白と md のエスケープ (`\\!`)、
+        `<br>` を除いた文字列で突き合わせる。見出しと、柱の文字列で始まる本文は残す"""
+        from book_epub.converter import is_dropped_paragraph, md_to_xhtml_body
+
+        head = "第1章「睡眠の悩み」を何とかしたい!"
+        md = "\n\n".join(
+            [
+                "# 第1章 「睡眠の悩み」を何とかしたい\\!",
+                "第1章 「睡眠の悩み」を<br>何とかしたい\\!",
+                "第1章 「睡眠の悩み」を何とかしたい! と思ったら、まず寝る時刻を決める。",
+                "本文。",
+            ]
+        )
+        html = md_to_xhtml_body(md, title="体調管理の本", drop_texts=frozenset({head}))
+        assert "<h1>第1章 「睡眠の悩み」を何とかしたい!</h1>" in html
+        assert "<p>第1章 「睡眠の悩み」を何とかしたい!</p>" not in html
+        assert "と思ったら、まず寝る時刻を決める。" in html and "<p>本文。</p>" in html
+        assert is_dropped_paragraph(
+            "第1章 「睡眠の悩み」を何とかしたい\\!", drop_texts=frozenset({head})
+        )
+        assert not is_dropped_paragraph("第1章 「睡眠の悩み」を何とかしたい\\!")
+
 
 def test_single_char_last_line_of_multiline_paragraph_is_kept() -> None:
     """MULTILINE の `^` は段落途中の行頭にも当たり、複数行段落の最終行が 1 文字だと

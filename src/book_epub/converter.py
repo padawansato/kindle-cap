@@ -32,6 +32,20 @@ _KINDLE_CHROME_PARAGRAPH_RE = re.compile(
 # 柱 (書名 + 副題) の 1 行段落が書名の後に続けてよい最大文字数。副題はこれより短く、
 # 書名で始まる本文はこれより長いか句点で終わる
 _RUNNING_HEAD_MAX_TAIL = 80
+# 空行区切り (段落境界)
+_BLOCK_SEP_RE = re.compile(r"\n[ \t]*\n")
+# 段落でないブロックの先頭文字 (見出し・HTML・表・リスト・引用)。drop_texts で落とす対象から外す
+_NON_PARAGRAPH_START = "#<|-*>"
+_BACKSLASH_OR_SPACE_RE = re.compile(r"[\\\s]+")
+
+
+def normalize_paragraph_text(text: str) -> str:
+    """段落の突き合わせ用の正規化: `<br>`・md のエスケープ (`\\`)・空白をすべて除く。
+
+    yomitoku の JSON (`contents`) と md の段落は、空白の有無・`<br>`・`\\!` などの
+    エスケープで食い違うので、両方をこれで揃えて比較する。
+    """
+    return _BACKSLASH_OR_SPACE_RE.sub("", _BR_TAG_RE.sub("", text))
 
 
 @dataclass(frozen=True)
@@ -91,34 +105,59 @@ def _drop_kindle_chrome_paragraphs(text: str) -> str:
     return _KINDLE_CHROME_PARAGRAPH_RE.sub("", text)
 
 
-def md_to_xhtml_body(markdown_text: str, title: str | None = None) -> str:
+def md_to_xhtml_body(
+    markdown_text: str, title: str | None = None, drop_texts: frozenset[str] = frozenset()
+) -> str:
     """Markdown を HTML 本文（body 内側）に変換する。表の html は素通し。
 
     yomitoku 由来の行折り返し `<br>`（原本のレイアウト都合の強制改行）は
     リフロー表示を破綻させるため、変換前に除去する。装飾見出しが割れてできた
     1 文字だけの段落も落とす (issue #68)。読み上げの邪魔になるノンブル（2〜4 桁の
     数字だけの段落）、Kindle の窓タイトル・進捗の段落、`title` で始まる柱の段落も落とす (#109)。
+    `drop_texts` は loader が JSON の位置から見つけた柱 (章名など) の正規化済み文字列
+    (`normalize_paragraph_text`) で、一致する段落を落とす。見出し・表・リスト行は対象外。
     """
-    text = _drop_noise_paragraphs(_strip_forced_linebreaks(markdown_text), title)
+    text = _drop_noise_paragraphs(_strip_forced_linebreaks(markdown_text), title, drop_texts)
     return str(md_lib.markdown(text, extensions=["tables"]))
 
 
-def _drop_noise_paragraphs(text: str, title: str | None) -> str:
+def _drop_listed_paragraphs(text: str, drop_texts: frozenset[str]) -> str:
+    """正規化した文字列が `drop_texts` にある段落ブロックを落とす (#109 の章名の柱)。"""
+    if not drop_texts:
+        return text
+    kept = [
+        block
+        for block in _BLOCK_SEP_RE.split(text)
+        if not block.strip()
+        or block.lstrip()[0] in _NON_PARAGRAPH_START
+        or normalize_paragraph_text(block) not in drop_texts
+    ]
+    return "\n\n".join(kept)
+
+
+def _drop_noise_paragraphs(
+    text: str, title: str | None, drop_texts: frozenset[str] = frozenset()
+) -> str:
     # 先頭の段落を落とすと残りが "\n" で始まり、次の規則の「空行の直後」(\n\n) 判定が
     # 外れるので、規則ごとに先頭の改行を剥がす
+    text = _drop_listed_paragraphs(text, drop_texts).lstrip("\n")
     text = _drop_single_char_paragraphs(text).lstrip("\n")
     text = _drop_page_number_paragraphs(text).lstrip("\n")
     text = _drop_kindle_chrome_paragraphs(text).lstrip("\n")
     return _drop_title_paragraphs(text, title)
 
 
-def is_dropped_paragraph(block: str, title: str | None = None) -> bool:
+def is_dropped_paragraph(
+    block: str, title: str | None = None, drop_texts: frozenset[str] = frozenset()
+) -> bool:
     """空行区切りの 1 ブロックが md_to_xhtml_body で丸ごと落とされるかを返す。
 
     ページ間の文の再結合 (page_join) が、変換時に消えるノンブル・柱・1 文字段落を
     飛ばして実質の段落境界を探すのに使う。判定は md_to_xhtml_body と同じ処理で行う。
     """
-    return not _drop_noise_paragraphs(_strip_forced_linebreaks(block) + "\n", title).strip()
+    return not _drop_noise_paragraphs(
+        _strip_forced_linebreaks(block) + "\n", title, drop_texts
+    ).strip()
 
 
 def normalize_figure_srcs(html: str) -> str:

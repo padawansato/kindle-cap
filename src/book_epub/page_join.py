@@ -44,8 +44,8 @@ def join_cross_page_sentences(
         if pages[i + 1].page_number != pages[i].page_number + 1:
             continue
         prev, nxt = blocks[i], blocks[i + 1]
-        tail = _last_kept_index(prev, title)
-        head = _first_kept_index(nxt, title)
+        tail = _last_kept_index(prev, title, pages[i].running_heads)
+        head = _first_kept_index(nxt, title, pages[i + 1].running_heads)
         if tail is None or head is None or not _can_join(prev[tail], nxt[head]):
             continue
         prev[tail] = _concat(prev[tail], nxt.pop(head))
@@ -61,16 +61,20 @@ def _split_blocks(markdown: str) -> list[str]:
     return [b for b in _BLOCK_SEP_RE.split(markdown.strip("\n")) if b.strip()]
 
 
-def _last_kept_index(blocks: list[str], title: str | None) -> int | None:
+def _last_kept_index(
+    blocks: list[str], title: str | None, drop_texts: frozenset[str] = frozenset()
+) -> int | None:
     for i in range(len(blocks) - 1, -1, -1):
-        if not is_dropped_paragraph(blocks[i], title):
+        if not is_dropped_paragraph(blocks[i], title, drop_texts):
             return i
     return None
 
 
-def _first_kept_index(blocks: list[str], title: str | None) -> int | None:
+def _first_kept_index(
+    blocks: list[str], title: str | None, drop_texts: frozenset[str] = frozenset()
+) -> int | None:
     for i, block in enumerate(blocks):
-        if not is_dropped_paragraph(block, title):
+        if not is_dropped_paragraph(block, title, drop_texts):
             return i
     return None
 
