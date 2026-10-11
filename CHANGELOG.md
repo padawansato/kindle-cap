@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.16.3] - 2026-10-11
+
 ### Fixed
 
 - `book-ocr --skip-existing` が、`pages/page_NNN.json` はあるが md が無いページを OCR せず markdown だけ描き直すようにした。これまでは md の有無だけで判定していたため、md 生成の前に中断された本（OS自作入門: JSON 300 枚・md 0 枚）を続きから回すと全ページを再 OCR していた（1 時間で 50 枚のやり直し）。JSON が正準（v0.5.0）なので、`YomiTokuEngine.render_from_json` が run_batch と同じ md レンダ worker（読み順の後処理・図の切り出し込み）を既存 JSON に対して回す。どちらも無いページだけ OCR する
@@ -235,7 +237,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.2...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.3...HEAD
+[0.16.3]: https://github.com/padawansato/kindle-cap/compare/v0.16.2...v0.16.3
 [0.16.2]: https://github.com/padawansato/kindle-cap/compare/v0.16.1...v0.16.2
 [0.16.1]: https://github.com/padawansato/kindle-cap/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/padawansato/kindle-cap/compare/v0.15.1...v0.16.0
