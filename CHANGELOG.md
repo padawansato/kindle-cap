@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-10-11
+
 ### Fixed
 
 - `book-epub` が落とす読み上げノイズを追加（#109）。(1) 書名で始まり副題まで続く柱の 1 行段落（これまでは書名と完全一致のみ。句点・感嘆符・疑問符を含むか、書名の後が 80 文字を超える段落は本文として残す）、(2) Kindle の窓タイトル「Kindle」と読書進捗「15%」だけの段落（背面撮影の切り出しに入ったもの）。撮影済み 4 冊で計測: コードレビューの教科書 256 枚で 236 段落（柱 126・Kindle 73）、実践Claude Code入門 227 枚で 159 段落、基盤モデルとロボットの融合 205 枚で 76 段落を追加で除去、縦書き本は変化なし。ページ間の文の再結合もこれらを飛ばして段落境界を探すようになる
@@ -223,7 +225,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.1...HEAD
+[0.16.1]: https://github.com/padawansato/kindle-cap/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/padawansato/kindle-cap/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/padawansato/kindle-cap/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/padawansato/kindle-cap/compare/v0.14.0...v0.15.0
