@@ -78,7 +78,7 @@ def render(manifest: dict[str, Any]) -> dict[str, Any]:
     from yomitoku.export.export_markdown import convert_markdown
     from yomitoku.schemas import DocumentAnalyzerSchema
 
-    from book_ocr.reading_order import fix_reading_order
+    from book_ocr.reading_order import fix_reading_order, page_image_size
 
     export_figure = manifest["export_figure"]
     figure_dir_name = manifest["figure_dir_name"]
@@ -87,8 +87,9 @@ def render(manifest: dict[str, Any]) -> dict[str, Any]:
     rendered: list[dict[str, Any]] = []
     for page in manifest["pages"]:
         raw = json.loads(Path(page["json"]).read_text(encoding="utf-8"))
-        # 見開きのページ順と縦書き 2 段組の連結 (issue #95)。JSON ファイルは変えない
-        raw = fix_reading_order(raw, page_order=page_order)
+        # 見開きのページ順と縦書き 2 段組の連結 (issue #95)。JSON ファイルは変えない。
+        # 見開きの中央は画像サイズから決める (要素の広がりだと右ページの余白で外れる)
+        raw = fix_reading_order(raw, page_order=page_order, page_size=page_image_size(page["png"]))
         schema = DocumentAnalyzerSchema(**raw)
 
         # figure を切り出すときだけ画像が要る。yomitoku CLI と同じ load_image を

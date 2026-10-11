@@ -22,6 +22,7 @@ Kindle の見開きキャプチャは 1 画像に左右 2 ページが入る。y
 from __future__ import annotations
 
 import copy
+from pathlib import Path
 from typing import Any
 
 PAGE_ORDERS = ("auto", "rtl", "ltr", "off")
@@ -33,6 +34,24 @@ _INDENT = ("　", " ")
 _OPENERS = tuple("○●◎◇◆□■▶▷・※「『（(【［[〈《")
 _CENTER_TOLERANCE = 0.02  # 画像幅に対する比。中央帯にかかる要素は「またぐ」と見なさない
 _KINDS = ("paragraphs", "tables", "figures")
+
+
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+def page_image_size(path: Path | str) -> tuple[int, int] | None:
+    """ページ画像 (PNG) の (幅, 高さ) を IHDR から読む。PNG でない・無い時は None。
+
+    画像ライブラリに依存しないので、yomitoku 側の venv で動く md_render_worker からも使える。
+    """
+    try:
+        with open(path, "rb") as f:
+            head = f.read(24)
+    except OSError:
+        return None
+    if len(head) < 24 or not head.startswith(_PNG_SIGNATURE) or head[12:16] != b"IHDR":
+        return None
+    return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
 
 
 def _extent(raw: dict[str, Any]) -> tuple[int, int]:
@@ -129,10 +148,18 @@ def _hoist_headings(group: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return hoisted + rest
 
 
-def fix_reading_order(raw: dict[str, Any], *, page_order: str = "auto") -> dict[str, Any]:
+def fix_reading_order(
+    raw: dict[str, Any],
+    *,
+    page_order: str = "auto",
+    page_size: tuple[int, int] | None = None,
+) -> dict[str, Any]:
     """見開きのページ順を直し、割れた縦書き段落を連結した新しい dict を返す。
 
     `page_order`: "auto" (縦書きが多ければ右ページ先) / "rtl" / "ltr" / "off" (何もしない)。
+    `page_size`: ページ画像の (幅, 高さ)。見開きの中央は画像の中央で決める。省略時は
+    要素の広がりから求めるが、右ページの余白が広いと中央が左へずれて見開き判定が外れる
+    (横書き見開きの実書籍 2 冊で 205 枚中 12 枚しか見開きと判定されなかった)。
     """
     if page_order not in PAGE_ORDERS:
         raise ValueError(f"page_order must be one of {PAGE_ORDERS}, got {page_order!r}")
@@ -143,7 +170,7 @@ def fix_reading_order(raw: dict[str, Any], *, page_order: str = "auto") -> dict[
     if not elements:
         return out
 
-    width, _height = _extent(out)
+    width = page_size[0] if page_size is not None else _extent(out)[0]
     center = width / 2
     tol = width * _CENTER_TOLERANCE
     spread = _is_spread(elements, width)
