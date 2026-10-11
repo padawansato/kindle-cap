@@ -310,3 +310,42 @@ def test_tqdm_disable_kwarg_when_stderr_not_tty(
     # pytest 環境では sys.stderr.isatty() == False のため disable=True
     kwargs = mock_tqdm.call_args.kwargs
     assert kwargs["disable"] is True
+
+
+# ---------------------------------------------------------------------------
+# 既存 JSON から md だけ描き直す (--skip-existing の JSON 対応)
+# ---------------------------------------------------------------------------
+
+
+def test_render_from_json_renders_markdown_without_running_ocr(tmp_path: Path) -> None:
+    """JSON が正準 (issue #70) なので、JSON があるページは OCR せず md レンダ worker だけ回す。
+    md の生成前に中断された本 (JSON 300 枚・md 0 枚) を --skip-existing で続きから
+    回した時に全ページを再 OCR していた (OS自作入門で 1 時間の無駄) のを防ぐ"""
+    pngs = _make_pngs(tmp_path, 2)
+    pages_dir = tmp_path / "pages"
+    pages_dir.mkdir()
+    entries = []
+    for n, png in enumerate(pngs, start=1):
+        json_path = pages_dir / f"page_{n:03d}.json"
+        json_path.write_text(json.dumps(_MINIMAL_PAGE_JSON), encoding="utf-8")
+        entries.append((n, png, json_path))
+    engine = YomiTokuEngine(yomitoku_bin=_fake_binary(tmp_path), json_out_dir=pages_dir)
+    manifests: list[dict[str, Any]] = []  # manifest は tempdir にあり、終了後は消えるので中で控える
+
+    def _capture(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        if _is_worker_call(cmd):
+            manifests.append(json.loads(Path(cmd[2]).read_text(encoding="utf-8")))
+        return _fake_yomitoku_subprocess(cmd, **kwargs)
+
+    with patch("book_ocr.engines.yomitoku.subprocess.run", side_effect=_capture) as mock_run:
+        pages = engine.render_from_json(entries)
+
+    assert _ocr_call_count(mock_run) == 0  # yomitoku CLI は呼ばない
+    assert len(manifests) == 1
+    manifest = manifests[0]
+    assert [Path(p["json"]) for p in manifest["pages"]] == [e[2] for e in entries]
+    assert manifest["page_order"] == "auto"
+    assert [(p.page_number, p.markdown, p.json_path) for p in pages] == [
+        (1, "OCR of page_001.png", entries[0][2]),
+        (2, "OCR of page_002.png", entries[1][2]),
+    ]

@@ -395,6 +395,52 @@ class TestSkipExistingOption:
         # 空ファイル page_001 も再 OCR、page_002 も新規 OCR
         assert len(seen) == 2
 
+    def test_skip_existing_renders_pages_with_json_but_no_md_instead_of_ocr(
+        self, tmp_path: Path
+    ) -> None:
+        """JSON はあるが md が無いページ (md 生成前に中断された本) は、OCR せず engine の
+        render_from_json で md だけ描き直す。md があるページは従来どおり読み出し、
+        どちらも無いページだけ OCR する。描き直した md は pages/ に書かれる"""
+        book = _make_book_dir(tmp_path, n_pages=3)
+        self._seed_existing_page(book, 1, "p1 from md")
+        (book / "pages" / "page_002.json").write_text("{}", encoding="utf-8")
+
+        ocr_seen: list[Path] = []
+        rendered: list[tuple[int, Path, Path]] = []
+
+        class RenderingEngine(FakeEngine):
+            def run_batch(self, pngs: list[Path]) -> list[PageText]:
+                ocr_seen.extend(pngs)
+                return super().run_batch(pngs)
+
+            def render_from_json(self, entries: list[tuple[int, Path, Path]]) -> list[PageText]:
+                rendered.extend(entries)
+                return [
+                    PageText(n, png, f"RENDERED from {j.name}", self.name, json_path=j)
+                    for n, png, j in entries
+                ]
+
+        run_ocr_pipeline(book_dir=book, engine=RenderingEngine(), skip_existing=True)
+
+        assert [p.name for p in ocr_seen] == ["page_003.png"]
+        assert rendered == [(2, book / "page_002.png", book / "pages" / "page_002.json")]
+        page2_md = (book / "pages" / "page_002.md").read_text(encoding="utf-8")
+        assert "RENDERED from page_002.json" in page2_md
+        book_md = (book / "my-book.md").read_text(encoding="utf-8")
+        for expected in ("p1 from md", "RENDERED from page_002.json", "OCR for page_003.png"):
+            assert expected in book_md
+        # render_from_json を持たない engine では従来どおり OCR に回す
+        ocr_seen.clear()
+
+        class PlainEngine(FakeEngine):
+            def run_batch(self, pngs: list[Path]) -> list[PageText]:
+                ocr_seen.extend(pngs)
+                return super().run_batch(pngs)
+
+        (book / "pages" / "page_002.md").unlink()
+        run_ocr_pipeline(book_dir=book, engine=PlainEngine(), skip_existing=True)
+        assert [p.name for p in ocr_seen] == ["page_002.png"]
+
     def test_index_page_count_includes_skipped(self, tmp_path: Path) -> None:
         """skipped ページも index.json の page_count に含まれる。"""
         book = _make_book_dir(tmp_path, n_pages=3)
@@ -470,7 +516,7 @@ class TestPartitionExistingFigureRefs:
         )
         png = tmp_path / "page_001.png"
         png.write_bytes(b"x")
-        existing, to_ocr = _partition_existing_pages([png], pages_dir, "yomitoku")
+        existing, _json_only, to_ocr = _partition_existing_pages([png], pages_dir, "yomitoku")
         assert to_ocr == []
         assert existing[0].markdown == '<img src="figures/page_001_figure_0.png" alt="図">'
 
