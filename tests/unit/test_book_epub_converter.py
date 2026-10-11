@@ -153,6 +153,35 @@ class TestDropReadAloudNoise:
         # title 未指定なら書名段落は残る
         assert f"<p>{title}</p>" in md_to_xhtml_body(md)
 
+    def test_running_head_with_subtitle_and_kindle_chrome_labels_are_dropped(self) -> None:
+        """一括 OCR 5 冊の計測 (#109): 柱は書名だけでなく副題まで続く (コードレビューの教科書
+        256 枚中 148 枚、基盤モデルとロボットの融合 13 枚)。背面撮影の切り出しに Kindle の
+        窓タイトル「Kindle」(125 枚) と進捗「15%」が入る。いずれも読み上げの流れを切る"""
+        from book_epub.converter import md_to_xhtml_body
+
+        title = "コードレビューの教科書"
+        md = "\n\n".join(
+            [
+                "Kindle",
+                f"{title}––なんとなく承認から抜け出すための観点と判断基準",
+                f"{title}を読んだ。",  # 本文: 句点で終わる
+                f"{title}" + "は" * 100,  # 本文: 長い
+                "15%",
+                "１００％",
+                "15%の人が答えた。",
+                "Kindle で読む。",
+                "\\}",  # コードの閉じ括弧 (md エスケープ) は残す
+            ]
+        )
+        html = md_to_xhtml_body(md, title=title)
+        assert "なんとなく承認" not in html
+        assert "<p>Kindle</p>" not in html and "<p>15%</p>" not in html and "１００％" not in html
+        assert f"{title}を読んだ。" in html and "は" * 100 in html
+        assert "15%の人が答えた。" in html and "Kindle で読む。" in html and "}" in html
+        # 副題つきの柱は title が無いと判定できないが、Kindle の窓タイトルと進捗は title 無しでも落ちる
+        html_no_title = md_to_xhtml_body(md)
+        assert "なんとなく承認" in html_no_title and "<p>Kindle</p>" not in html_no_title
+
 
 def test_single_char_last_line_of_multiline_paragraph_is_kept() -> None:
     """MULTILINE の `^` は段落途中の行頭にも当たり、複数行段落の最終行が 1 文字だと

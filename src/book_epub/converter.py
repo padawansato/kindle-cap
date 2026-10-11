@@ -24,6 +24,14 @@ _SINGLE_CHAR_PARAGRAPH_RE = re.compile(
 _PAGE_NUMBER_PARAGRAPH_RE = re.compile(
     r"(?:(?<=\n\n)|\A)[ \t]*[0-9０-９]{2,4}[ \t]*(?:\n(?=\n|$)|\Z)", re.MULTILINE
 )
+# Kindle の窓まわりが切り出しに入ったもの: 窓タイトル「Kindle」と読書進捗「15%」 (#109)。
+# 背面撮影した 2 冊の計測で 256 枚中 86 枚 / 205 枚中 28 枚のページ先頭に「Kindle」が出ていた
+_KINDLE_CHROME_PARAGRAPH_RE = re.compile(
+    r"(?:(?<=\n\n)|\A)[ \t]*(?:Kindle|[0-9０-９]{1,3}[%％])[ \t]*(?:\n(?=\n|$)|\Z)", re.MULTILINE
+)
+# 柱 (書名 + 副題) の 1 行段落が書名の後に続けてよい最大文字数。副題はこれより短く、
+# 書名で始まる本文はこれより長いか句点で終わる
+_RUNNING_HEAD_MAX_TAIL = 80
 
 
 @dataclass(frozen=True)
@@ -61,16 +69,26 @@ def _drop_page_number_paragraphs(text: str) -> str:
 
 
 def _drop_title_paragraphs(text: str, title: str | None) -> str:
-    """書名と完全一致（前後空白を除く）する段落を落とす。ページ上端の柱が本文に混ざったもの。
+    """書名で始まる柱の 1 行段落を落とす。ページ上端の柱が本文に混ざったもの (#109)。
 
-    `# 書名` の見出しは一致しないので残る。
+    書名と完全一致するものに加え、書名の後に副題が続くもの
+    (「コードレビューの教科書––なんとなく承認から抜け出すための観点と判断基準」) も落とす。
+    句点・感嘆符・疑問符を含む段落と、書名の後が `_RUNNING_HEAD_MAX_TAIL` 文字を超える
+    段落は本文とみなして残す。`# 書名` の見出しは一致しないので残る。
     """
     if title is None or not title.strip():
         return text
     pattern = re.compile(
-        rf"(?:(?<=\n\n)|\A)[ \t]*{re.escape(title.strip())}[ \t]*(?:\n(?=\n|$)|\Z)", re.MULTILINE
+        rf"(?:(?<=\n\n)|\A)[ \t]*{re.escape(title.strip())}[^\n。！？!?]{{0,{_RUNNING_HEAD_MAX_TAIL}}}"
+        rf"(?:\n(?=\n|$)|\Z)",
+        re.MULTILINE,
     )
     return pattern.sub("", text)
+
+
+def _drop_kindle_chrome_paragraphs(text: str) -> str:
+    """Kindle の窓タイトル「Kindle」と読書進捗「15%」だけの段落を落とす。"""
+    return _KINDLE_CHROME_PARAGRAPH_RE.sub("", text)
 
 
 def md_to_xhtml_body(markdown_text: str, title: str | None = None) -> str:
@@ -79,16 +97,19 @@ def md_to_xhtml_body(markdown_text: str, title: str | None = None) -> str:
     yomitoku 由来の行折り返し `<br>`（原本のレイアウト都合の強制改行）は
     リフロー表示を破綻させるため、変換前に除去する。装飾見出しが割れてできた
     1 文字だけの段落も落とす (issue #68)。読み上げの邪魔になるノンブル（2〜4 桁の
-    数字だけの段落）と、`title` と一致する柱の段落も落とす。
+    数字だけの段落）、Kindle の窓タイトル・進捗の段落、`title` で始まる柱の段落も落とす (#109)。
     """
     text = _drop_noise_paragraphs(_strip_forced_linebreaks(markdown_text), title)
     return str(md_lib.markdown(text, extensions=["tables"]))
 
 
 def _drop_noise_paragraphs(text: str, title: str | None) -> str:
-    return _drop_title_paragraphs(
-        _drop_page_number_paragraphs(_drop_single_char_paragraphs(text)), title
-    )
+    # 先頭の段落を落とすと残りが "\n" で始まり、次の規則の「空行の直後」(\n\n) 判定が
+    # 外れるので、規則ごとに先頭の改行を剥がす
+    text = _drop_single_char_paragraphs(text).lstrip("\n")
+    text = _drop_page_number_paragraphs(text).lstrip("\n")
+    text = _drop_kindle_chrome_paragraphs(text).lstrip("\n")
+    return _drop_title_paragraphs(text, title)
 
 
 def is_dropped_paragraph(block: str, title: str | None = None) -> bool:
