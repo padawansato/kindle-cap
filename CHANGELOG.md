@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-10-11
+
 ### Fixed
 
 - `book-epub` が章名の柱を落とすようにした（#109）。柱は書名と一致しないので文字列では見つけられず、`pages/page_NNN.json` の段落の位置で見つける: ページ画像の天（上 8%）にある横書き段落か小口（左右 8%）にある縦書き段落で 60 文字以内のものが、3 ページ以上で同じ文字列なら柱とみなし、そのページの段落から落とす（章の扉や目次で本文として出る同じ文字列は残る）。ページ間の文の再結合も柱を飛ばして境界を探す。撮影済み 4 冊で計測: 発達障害の人が上手に体調管理するための本で章名の柱 7 種 55 回を全部除去し、残った「第N章」は目次と章扉の本物だけ。横書き 3 冊では書名の柱と「Kindle」（v0.16.1 で文字列でも落ちる）以外に該当なし。JSON が無い本は従来どおり
@@ -229,7 +231,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.2...HEAD
+[0.16.2]: https://github.com/padawansato/kindle-cap/compare/v0.16.1...v0.16.2
 [0.16.1]: https://github.com/padawansato/kindle-cap/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/padawansato/kindle-cap/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/padawansato/kindle-cap/compare/v0.15.0...v0.15.1
