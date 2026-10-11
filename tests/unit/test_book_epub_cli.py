@@ -130,3 +130,64 @@ def test_cli_joins_sentence_split_across_pages_unless_disabled(tmp_path: Path) -
     docs = bodies(separate)
     assert "<p>ページ末尾で、切れた文の前</p>" in docs["page_001.xhtml"]
     assert "<p>半はここに続く。</p>" in docs["page_002.xhtml"]
+
+
+def test_cli_drops_chapter_running_heads_found_by_json_boxes_and_joins_across_them(
+    tmp_path: Path,
+) -> None:
+    """#109: 縦書き本の章名の柱 (小口の縦書き段落) は書名と一致しないので文字列では落とせない。
+    pages/*.json の box で見つけて落とし、ページ間の文の再結合も柱を飛ばして行う"""
+    from ebooklib import epub
+
+    book_dir = _make_book_dir(tmp_path)
+    pages = book_dir / "pages"
+    head_md = "第1章 「睡眠の悩み」を何とかしたい\\!"
+    head_json = "第1章 「睡眠の悩み」を何とかしたい!"
+    mds = {
+        1: "# 第1章\n\nページ末尾で、切れ<br>た文の前\n\n" + head_md,
+        2: head_md + "\n\n半はここに続く。\n\n次の段落。",
+        3: head_md + "\n\n三ページ目。",
+    }
+    png_header = (
+        b"\x89PNG\r\n\x1a\n"
+        + b"\x00\x00\x00\rIHDR"
+        + (2940).to_bytes(4, "big")
+        + (1846).to_bytes(4, "big")
+    )
+    for n, md in mds.items():
+        (pages / f"page_{n:03d}.md").write_text(f"<!-- page:{n:03d} -->\n\n{md}", encoding="utf-8")
+        (book_dir / f"page_{n:03d}.png").write_bytes(png_header)
+        (pages / f"page_{n:03d}.json").write_text(
+            json.dumps(
+                {
+                    "paragraphs": [
+                        {
+                            "box": [138, 200, 168, 640],
+                            "contents": head_json,
+                            "direction": "vertical",
+                            "order": 0,
+                            "role": None,
+                        }
+                    ],
+                    "tables": [],
+                    "figures": [],
+                    "words": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    dest = tmp_path / "out.epub"
+    result = runner.invoke(app, [str(book_dir), "--out", str(dest)])
+    assert result.exit_code == 0, result.output
+    docs = {
+        item.get_name(): item.get_content().decode("utf-8")
+        for item in epub.read_epub(str(dest)).get_items()
+        if item.get_type() == 9  # ITEM_DOCUMENT
+    }
+    assert "<p>ページ末尾で、切れた文の前半はここに続く。</p>" in docs["page_001.xhtml"]
+    for name in ("page_001.xhtml", "page_002.xhtml", "page_003.xhtml"):
+        assert "睡眠の悩み" not in docs[name], name
+    assert (
+        "<p>次の段落。</p>" in docs["page_002.xhtml"] and "三ページ目。" in docs["page_003.xhtml"]
+    )

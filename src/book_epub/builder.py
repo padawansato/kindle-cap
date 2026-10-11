@@ -38,7 +38,9 @@ def build_epub(source: BookSource, author: str | None = None) -> tuple[epub.Epub
     toc_entries: list[tuple[Heading, str]] = []
     for page in source.pages:
         file_name = f"page_{page.page_number:03d}.xhtml"
-        html = normalize_figure_srcs(md_to_xhtml_body(page.markdown, title=source.title))
+        html = normalize_figure_srcs(
+            md_to_xhtml_body(page.markdown, title=source.title, drop_texts=page.running_heads)
+        )
         html = _drop_missing_figures(html, available, warnings)
         marker = (
             f'<span epub:type="pagebreak" role="doc-pagebreak" id="page_{page.page_number:03d}"/>'
