@@ -180,6 +180,40 @@ class YomiTokuEngine:
                 for n, png, _json_path in entries
             ]
 
+    def render_from_json(self, entries: list[tuple[int, Path, Path]]) -> list[PageText]:
+        """既存の生 JSON (n, png, json_path) から md だけ描き直す。OCR は走らせない。
+
+        JSON が正準 (issue #70) なので、`--skip-existing` で JSON はあるが md が無いページ
+        (md 生成前に中断された本) はこれで続きから再開できる。読み順の後処理 (issue #95) や
+        figure 切り出しは run_batch と同じ worker で行うので出力も同じになる。
+        """
+        if not entries:
+            return []
+        binary = self._resolve_binary()
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            figures_dir = (
+                self.figure_out_dir if self.figure_out_dir is not None else tmp_dir / "figures"
+            )
+            manifest = _build_render_manifest(
+                entries,
+                figure_parent=figures_dir.parent,
+                figure_dir_name=figures_dir.name,
+                export_figure=self.figure,
+                page_order=self.page_order,
+            )
+            markdown_by_page = self._render_markdown(binary, manifest, tmp_dir)
+        return [
+            PageText(
+                page_number=n,
+                png_path=png,
+                markdown=_finalize_figure_refs(markdown_by_page[n], figures_dir),
+                ocr_engine=self.name,
+                json_path=json_path,
+            )
+            for n, png, json_path in entries
+        ]
+
     def _persist_json(self, entries: list[tuple[int, Path, Path]]) -> dict[int, Path]:
         """tmp の JSON を `<json_out_dir>/page_NNN.json` へ退避し、page -> 保存先を返す。"""
         if self.json_out_dir is None:

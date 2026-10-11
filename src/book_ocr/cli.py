@@ -109,9 +109,24 @@ def run_ocr_pipeline(
     existing_pages: list[PageText] = []
     pngs_to_ocr: list[Path] = list(pngs)
     if skip_existing:
-        existing_pages, pngs_to_ocr = _partition_existing_pages(
+        existing_pages, json_only, pngs_to_ocr = _partition_existing_pages(
             pngs, out_dir / "pages", engine.name
         )
+        if json_only:
+            # JSON はあるが md が無いページ (md 生成前に中断された本)。JSON が正準なので
+            # OCR はせず md だけ描き直す。engine が対応していなければ従来どおり OCR に回す
+            render_from_json = getattr(engine, "render_from_json", None)
+            if render_from_json is None:
+                pngs_to_ocr = sorted(
+                    [*pngs_to_ocr, *(png for _n, png, _json in json_only)],
+                    key=_parse_page_number,
+                )
+            else:
+                typer.echo(
+                    f"既存 JSON {len(json_only)} ページは OCR せず markdown だけ描き直します",
+                    err=True,
+                )
+                existing_pages = [*existing_pages, *render_from_json(json_only)]
 
     initial_meta = BookMetadata(
         title=title,
@@ -310,19 +325,28 @@ def _parse_page_number(p: Path) -> int:
 
 def _partition_existing_pages(
     pngs: list[Path], pages_dir: Path, engine_name: str
-) -> tuple[list[PageText], list[Path]]:
-    """`--skip-existing` 用 (issue #41): 既存 `pages/page_NNN.md` を読み出して
-    PageText に再構成し、未存在のページを OCR 対象として返す。
+) -> tuple[list[PageText], list[tuple[int, Path, Path]], list[Path]]:
+    """`--skip-existing` 用 (issue #41): ページを 3 つに分ける。
+
+    1. 既存 `pages/page_NNN.md` があるページ → 読み出して PageText に再構成
+    2. md は無いが `pages/page_NNN.json` があるページ → (n, png, json) として返す
+       (呼び出し側が engine.render_from_json で md だけ描き直す)
+    3. どちらも無いページ → OCR 対象
 
     既存 md 先頭の `<!-- page:NNN -->` プレフィクスは render_page_md と対称に剥がす。
-    空ファイルは `missing` 扱いで再 OCR にまわす (壊れた状態のフォールバック)。"""
+    空ファイルは `missing` 扱いにする (壊れた状態のフォールバック)。"""
     existing: list[PageText] = []
+    json_only: list[tuple[int, Path, Path]] = []
     to_ocr: list[Path] = []
     for png in pngs:
         n = _parse_page_number(png)
         md_path = pages_dir / f"page_{n:03d}.md"
         if not md_path.exists() or md_path.stat().st_size == 0:
-            to_ocr.append(png)
+            json_path = pages_dir / f"page_{n:03d}.json"
+            if json_path.exists() and json_path.stat().st_size > 0:
+                json_only.append((n, png, json_path))
+            else:
+                to_ocr.append(png)
             continue
         content = md_path.read_text(encoding="utf-8")
         body = _PAGE_MARKER_RE.sub("", content, count=1)
@@ -338,7 +362,7 @@ def _partition_existing_pages(
                 json_path=json_path if json_path.exists() else None,
             )
         )
-    return existing, to_ocr
+    return existing, json_only, to_ocr
 
 
 def _build_searchable_pdf(
