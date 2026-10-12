@@ -345,6 +345,48 @@ def test_run_all_stops_when_kindle_stays_in_reader(tmp_path: Path) -> None:
     assert log == ["open:閉じられない本", "capture", "close", "close"]
 
 
+def test_run_all_stops_after_consecutive_open_failures(tmp_path: Path) -> None:
+    """open_book の失敗が 3 冊続いたらライブラリ側の異常とみなして中断する (issue #131:
+    シートが被さって in_reader をすり抜け、残り全冊が 1 秒ずつ連鎖失敗した)。
+    撮れた本を挟めば数え直す。"""
+    titles = [
+        "開かない1",
+        "開かない2",
+        "撮れる本",
+        "開かない3",
+        "開かない4",
+        "開かない5",
+        "届かない本",
+    ]
+    books = [_book(t) for t in titles]
+    opened: list[str] = []
+
+    def open_book(b: Book) -> None:
+        opened.append(b.title)
+        if b.title != "撮れる本":
+            raise LookupError(f"ライブラリに見つかりません: {b.title}")
+
+    results = run_all(
+        books,
+        out=tmp_path,
+        include_pdf=False,
+        only=None,
+        limit=None,
+        open_book=open_book,
+        close_book=lambda: None,
+        capture_book=lambda b, name: None,
+    )
+    assert opened == titles[:-1]
+    assert [r.status for r in results] == [
+        "failed",
+        "failed",
+        "captured",
+        "failed",
+        "failed",
+        "failed",
+    ]
+
+
 def test_run_all_recovers_when_a_retry_close_returns_to_library(tmp_path: Path) -> None:
     books = [_book("一度目は閉じない本"), _book("次の本")]
     log: list[str] = []

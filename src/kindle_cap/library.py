@@ -240,7 +240,11 @@ def open_book(
     sleeper: Callable[[float], None] = time.sleep,
 ) -> None:
     """書籍ボタンを押して開く。未ダウンロードなら 1 回目の押下で DL が始まるので、
-    「ダウンロードされました」になるまで待ってもう一度押す。"""
+    「ダウンロードされました」になるまで待ってもう一度押す。
+
+    ライブラリの上にシートが残っていると押下もスクロールも効かないので、探す前に閉じる
+    (issue #131)。"""
+    dismiss_sheet(app)
     _press_book(app, book)
     if not book.downloaded:
         logger.info("ダウンロード待ち: %s", book.title)

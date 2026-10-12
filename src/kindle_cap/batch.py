@@ -21,6 +21,9 @@ SKIP_EXISTING = "既存 PDF あり"
 SKIP_SAMPLE = "サンプル"  # 書籍情報シートが割り込むなど挙動が違うので常に対象外
 SKIP_PDF = "PDF"
 SKIP_SERIES = "シリーズ (巻一覧)"  # 漫画などのシリーズは方針として対象外 (対応予定なし)
+# open_book の失敗がこの冊数続いたらライブラリ側の異常 (シートが被さった等) とみなして中断する。
+# 1 冊ごとの失敗として進むと残り全冊が 1 秒ずつ連鎖失敗する (issue #131)
+MAX_CONSECUTIVE_OPEN_FAILURES = 3
 
 
 @dataclass(frozen=True)
@@ -83,6 +86,7 @@ def run_all(
     (ライブラリに居ないと以降の全冊が「見つかりません」で連鎖失敗するため、issue #127)。"""
     results: list[BookResult] = []
     done = 0
+    open_failures = 0
     targets = select_books(books, out=out, include_pdf=include_pdf, only=only)
     for i, (book, name, reason) in enumerate(targets):
         if reason is not None:
@@ -106,7 +110,22 @@ def run_all(
         done += 1
         logger.info("=== [%d] %s ===", done, book.title)
         try:
-            open_book(book)
+            try:
+                open_book(book)
+            except Exception:
+                open_failures += 1
+                if open_failures >= MAX_CONSECUTIVE_OPEN_FAILURES:
+                    logger.exception("失敗: %s", book.title)
+                    results.append(BookResult(book, name, "failed", error="open_book に失敗"))
+                    remaining = sum(1 for _, _, r in targets[i + 1 :] if r is None)
+                    logger.error(
+                        "本を開けない状態が %d 冊続いたので中断します (残り %d 冊は再実行で続きから)",
+                        open_failures,
+                        remaining,
+                    )
+                    break
+                raise
+            open_failures = 0
             try:
                 saved = save_position() if save_position is not None else None
                 try:
