@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.16.6] - 2026-10-13
+
 ### Fixed
 
 - `kindle-cap-all` で「リーダーが開きません」の後、ライブラリの書籍ボタンは見えているのにどの本も「ライブラリに見つかりません」になり、残り全冊が 1 秒ずつ連鎖失敗していたのを直した（#131）。`#127` の「リーダーに残っている」判定をすり抜けるケース。本を開けない失敗が 3 冊続いたらライブラリ側の異常とみなしてループを中断する（再実行で続きから進む）。また `open_book` は書籍ボタンを探す前にもシートを閉じる
@@ -253,7 +255,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.5...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.6...HEAD
+[0.16.6]: https://github.com/padawansato/kindle-cap/compare/v0.16.5...v0.16.6
 [0.16.5]: https://github.com/padawansato/kindle-cap/compare/v0.16.4...v0.16.5
 [0.16.4]: https://github.com/padawansato/kindle-cap/compare/v0.16.3...v0.16.4
 [0.16.3]: https://github.com/padawansato/kindle-cap/compare/v0.16.2...v0.16.3
