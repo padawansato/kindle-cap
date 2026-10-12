@@ -70,21 +70,39 @@ def run_all(
     capture_book: Callable[[Book, str], None],
     save_position: Callable[[], Status | None] | None = None,
     restore_position: Callable[[Status | None], None] | None = None,
+    in_reader: Callable[[], bool] | None = None,
 ) -> list[BookResult]:
     """選ばれた本を順に open → (位置記録) → capture → (位置復元) → close する.
 
     `save_position` / `restore_position` を渡すと、開いた直後の読書位置を記録し、
     撮影の後 (撮影が失敗しても) close の前に戻す。復元の失敗は警告にとどめ、
-    撮影結果は失わない。"""
+    撮影結果は失わない。
+
+    `in_reader` を渡すと、次の本を開く前に Kindle がリーダーに残っていないか確かめる。
+    残っていれば `close_book` を 1 回やり直し、それでも戻れなければループを中断する
+    (ライブラリに居ないと以降の全冊が「見つかりません」で連鎖失敗するため、issue #127)。"""
     results: list[BookResult] = []
     done = 0
-    for book, name, reason in select_books(books, out=out, include_pdf=include_pdf, only=only):
+    targets = select_books(books, out=out, include_pdf=include_pdf, only=only)
+    for i, (book, name, reason) in enumerate(targets):
         if reason is not None:
             logger.info("skip (%s): %s", reason, book.title)
             results.append(BookResult(book, name, "skipped", reason=reason))
             continue
         if limit is not None and done >= limit:
             break
+        if in_reader is not None and in_reader():
+            logger.warning("Kindle がリーダーに残っています。閉じ直します")
+            try:
+                close_book()
+            except Exception as e:
+                logger.warning("閉じ直しに失敗: %s", e)
+            if in_reader():
+                remaining = sum(1 for _, _, r in targets[i:] if r is None)
+                logger.error(
+                    "ライブラリに戻れないので中断します (残り %d 冊は再実行で続きから)", remaining
+                )
+                break
         done += 1
         logger.info("=== [%d] %s ===", done, book.title)
         try:

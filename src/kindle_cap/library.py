@@ -33,6 +33,9 @@ _CLOSE_BOOK = "本を閉じる"
 # 選択モード (「N件の選択されたアイテム」「キャンセル」「アクション」) になる (issue #84)
 _CANCEL_SELECTION = "キャンセル"
 _CLOSE_SHEET = "閉じる"  # 書籍情報シート (サンプルを開くと出る) の閉じるボタン
+# リーダー右上に出るヒントのポップアップ (「勉強に役立つ機能 … お試しください。」+「OK」)。
+# 初めて開く本で出て、出ている間はキー送りがポップアップに食われページが止まる (issue #127)
+_CLOSE_HINT = "OK"
 # 読書位置の同期シート (本を開いた直後に出る。「最新の位置に移動」/「位置Nに戻る」)。
 # ハンドルも「閉じる」と名乗るが AXPress は効かず、Escape で消える (issue #86)
 _SYNC_SHEET_RE = re.compile(r"最新の位置に移動|位置\s*\d+に戻る")
@@ -270,19 +273,22 @@ def dismiss_sheet(app: ax.AXElement) -> bool:
       (前面でなくてよい) (issue #86)
     - 書籍情報シート (「閉じる」「シェア」): サンプル本を開いたときに出る。出ている間は
       chrome (本を閉じる等) に届かない。「閉じる」を AXPress
+    - ヒントのポップアップ (「勉強に役立つ機能」+「OK」): 初めて開く本で出る。出ている間は
+      ページ送りが効かず、同じページを撮り続けて終端と誤認する。「OK」を AXPress (issue #127)
     """
     if ax.find(app, "AXButton", lambda d: _SYNC_SHEET_RE.search(d) is not None):
         logger.info("読書位置の同期シートを閉じます (Escape)")
         post_key(_KEY_ESCAPE)
         time.sleep(1.0)
         return True
-    buttons = ax.find(app, "AXButton", lambda d: d == _CLOSE_SHEET)
-    if not buttons:
-        return False
-    logger.info("書籍情報シートを閉じます")
-    ax.perform(buttons[0], "AXPress")
-    time.sleep(1.0)
-    return True
+    for label, what in ((_CLOSE_SHEET, "書籍情報シート"), (_CLOSE_HINT, "ヒントのポップアップ")):
+        buttons = ax.find(app, "AXButton", label.__eq__)
+        if buttons:
+            logger.info("%sを閉じます", what)
+            ax.perform(buttons[0], "AXPress")
+            time.sleep(1.0)
+            return True
+    return False
 
 
 def close_book(app: ax.AXElement, *, geometry: tuple[int, int, int, int]) -> None:
