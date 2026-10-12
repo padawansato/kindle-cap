@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.16.4] - 2026-10-12
+
 ### Fixed
 
 - `book-ocr --page-order auto` の縦書き 2 段連結が、小口（画像幅の外側 8%）にある 60 文字以内の縦書き段落（章名の柱）を上段末尾と誤認して下段の本文に連結していたのを直した（#124）。柱は連結元にも連結先にもならず、本文の左にあっても「段末ではない」判定の邪魔をしない。実書籍（ちょっとしたことでうまくいく 発達障害の人が上手に勉強するための本、83 ページ）で連結 109 件中 26 件が柱で、本文の先頭に章名が混入し `book-epub` の柱除去も効かなくなっていた。`pages/page_NNN.json` は変わらないので、既存の本は `book-ocr --skip-existing` で md を描き直せる（md を消して JSON だけ残す）
@@ -241,7 +243,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.3...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.4...HEAD
+[0.16.4]: https://github.com/padawansato/kindle-cap/compare/v0.16.3...v0.16.4
 [0.16.3]: https://github.com/padawansato/kindle-cap/compare/v0.16.2...v0.16.3
 [0.16.2]: https://github.com/padawansato/kindle-cap/compare/v0.16.1...v0.16.2
 [0.16.1]: https://github.com/padawansato/kindle-cap/compare/v0.16.0...v0.16.1
