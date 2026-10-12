@@ -125,7 +125,7 @@ def test_join_guards(a_tail: str, b_head: str, a_role: str | None, joined: bool)
                 "role": a_role,
             },
             {
-                "box": [2600, 1000, 2700, 1500],
+                "box": [2300, 1000, 2400, 1500],  # 小口 (右端 8%) より内側の本文
                 "contents": b_head,
                 "direction": "vertical",
                 "order": 1,
@@ -227,3 +227,43 @@ def test_page_image_size_reads_png_header(tmp_path: Path) -> None:
     assert page_image_size(tmp_path / "missing.png") is None
     (tmp_path / "not.png").write_bytes(b"GIF89a")
     assert page_image_size(tmp_path / "not.png") is None
+
+
+def test_running_head_in_outer_margin_is_neither_join_source_nor_blocker() -> None:
+    """小口 (画像幅の外側 8%) にある短い縦書き段落は章名の柱なので、上段末尾として下段に
+    連結しない。また、柱が本文の左にあるせいで本文の上段末尾が「段末ではない」と
+    見なされて連結を妨げてもいけない (issue #124: 実書籍 83 ページで連結 109 件中 26 件が柱)"""
+    head = {
+        "box": [138, 199, 169, 692],  # 左ページの左端、幅 2940 の 8% = 235 より内側
+        "contents": "第1章予定通りにできないのを何とかしたい",
+        "direction": "vertical",
+        "order": 0,
+        "role": None,
+    }
+    upper = {
+        "box": [300, 250, 1300, 900],
+        "contents": "…傾向があるからといって実",
+        "direction": "vertical",
+        "order": 1,
+        "role": None,
+    }
+    lower = {
+        "box": [300, 1000, 1300, 1600],
+        "contents": "際に障害があるとは限らない。",
+        "direction": "vertical",
+        "order": 2,
+        "role": None,
+    }
+    right = {
+        "box": [1600, 250, 2800, 1600],
+        "contents": "右ページの本文。",
+        "direction": "vertical",
+        "order": 3,
+        "role": None,
+    }
+    raw = {"paragraphs": [head, upper, lower, right], "tables": [], "figures": []}
+    fixed = fix_reading_order(copy.deepcopy(raw), page_order="rtl", page_size=(2940, 1846))
+    by_text = {p["contents"].split("\n")[0]: p for p in fixed["paragraphs"]}
+    assert by_text[head["contents"]]["contents"] == head["contents"]  # 柱は手つかず
+    assert by_text[upper["contents"]]["contents"] == upper["contents"] + "\n" + lower["contents"]
+    assert len(fixed["paragraphs"]) == 3

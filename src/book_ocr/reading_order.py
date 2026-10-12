@@ -33,6 +33,10 @@ _INDENT = ("　", " ")
 # 実書籍 93 ページの連結候補を目視した結果、誤連結はすべて「○」で始まる箇条書きだった
 _OPENERS = tuple("○●◎◇◆□■▶▷・※「『（(【［[〈《")
 _CENTER_TOLERANCE = 0.02  # 画像幅に対する比。中央帯にかかる要素は「またぐ」と見なさない
+# 小口 (画像幅の外側 8%) にある短い縦書き段落は章名の柱 (book_epub.loader の柱検出と同じ規則)。
+# 上段末尾でも下段先頭でもないので連結の候補から外す (issue #124: 実書籍で連結 109 件中 26 件が柱)
+_MARGIN_BAND = 0.08
+_RUNNING_HEAD_MAX_CHARS = 60
 _KINDS = ("paragraphs", "tables", "figures")
 
 
@@ -110,18 +114,31 @@ def _y_overlaps(a: dict[str, Any], b: dict[str, Any]) -> bool:
     return bool(a["box"][1] < b["box"][3] and b["box"][1] < a["box"][3])
 
 
+def _is_running_head(p: dict[str, Any], width: int) -> bool:
+    """小口の余白帯にある短い縦書き段落 (章名の柱) か。"""
+    x0, _, x1, _ = p["box"]
+    in_margin = x1 < width * _MARGIN_BAND or x0 > width * (1 - _MARGIN_BAND)
+    return in_margin and len(p["contents"]) <= _RUNNING_HEAD_MAX_CHARS
+
+
 def _find_continuation(
-    a: dict[str, Any], candidates: list[dict[str, Any]]
+    a: dict[str, Any], candidates: list[dict[str, Any]], width: int
 ) -> dict[str, Any] | None:
     """上段の左端で句点なしに終わる縦書き段落 A の続きを、下段の右端から探す。
 
     yomitoku の order は見出しなどが間に割り込むことがあるので、順序ではなく
     位置で決める。A と同じ段 (y が重なる) で A より左に縦書き段落があれば A は
     段の末尾ではないので対象外。B は A より下にある縦書き段落のうち最も上の段で、
-    その段の右端のもの。"""
+    その段の右端のもの。小口の柱は A にも B にもならず、A の左にあっても無視する。"""
     if not _is_body_vertical(a) or a["contents"].endswith(_TERMINAL):
         return None
-    others = [p for p in candidates if p is not a and _is_body_vertical(p)]
+    if _is_running_head(a, width):
+        return None
+    others = [
+        p
+        for p in candidates
+        if p is not a and _is_body_vertical(p) and not _is_running_head(p, width)
+    ]
     if any(_y_overlaps(a, p) and p["box"][2] <= a["box"][0] for p in others):
         return None
     below = [p for p in others if p["box"][1] >= a["box"][3]]
@@ -199,7 +216,7 @@ def fix_reading_order(
         group = [p for p in paragraphs if h is None or half(p) == h]
         for a in group:
             while id(a) not in removed:
-                b = _find_continuation(a, [p for p in group if id(p) not in removed])
+                b = _find_continuation(a, [p for p in group if id(p) not in removed], width)
                 if b is None:
                     break
                 a["contents"] = a["contents"] + "\n" + b["contents"]
