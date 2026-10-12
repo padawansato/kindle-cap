@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.16.5] - 2026-10-12
+
 ### Fixed
 
 - `kindle-cap-all` が、初めて開く本でリーダー右上に出るヒントのポップアップ（「勉強に役立つ機能 … お試しください。」+「OK」）を知らず、出ている間はページ送りが効かないので同じページを 4 回撮って「終端」と誤認し、4 ページの PDF を作って次へ進んでいたのを直した（#127）。`dismiss_sheet` が「OK」を押す。さらに「本を閉じる」に失敗して Kindle がリーダーに残ったまま次の本へ進むと、残り全冊が「ライブラリに見つかりません」で 1 秒以内に連鎖失敗していたので、次の本を開く前にリーダーなら閉じ直し、それでも戻れなければループを中断するようにした（再実行で続きから進む）
@@ -247,7 +249,8 @@
 - 個人利用前提。Kindle DRM の回避目的ではなく、購入済み書籍を別環境（タブレット閲覧、後段の OCR）に流す入力素材生成のためのツール
 - 設計ドキュメント：`docs/superpowers/specs/2026-04-25-kindle-screenshot-design.md`
 
-[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.4...HEAD
+[Unreleased]: https://github.com/padawansato/kindle-cap/compare/v0.16.5...HEAD
+[0.16.5]: https://github.com/padawansato/kindle-cap/compare/v0.16.4...v0.16.5
 [0.16.4]: https://github.com/padawansato/kindle-cap/compare/v0.16.3...v0.16.4
 [0.16.3]: https://github.com/padawansato/kindle-cap/compare/v0.16.2...v0.16.3
 [0.16.2]: https://github.com/padawansato/kindle-cap/compare/v0.16.1...v0.16.2
