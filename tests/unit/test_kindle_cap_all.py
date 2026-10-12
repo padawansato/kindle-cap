@@ -313,27 +313,104 @@ def test_run_all_restores_reading_position_before_closing_even_if_capture_fails(
     ]
 
 
+def test_run_all_stops_when_kindle_stays_in_reader(tmp_path: Path) -> None:
+    """close_book が失敗して Kindle がリーダーに残ったら、次の本の前に閉じ直し、
+    それでも戻れなければ残りを「ライブラリに見つかりません」で連鎖失敗させずに中断する
+    (issue #127: 実際に 300 冊超が 1 秒で全滅した)。"""
+    books = [_book("閉じられない本"), _book("次の本"), _book("その次の本")]
+    log: list[str] = []
+    state = {"reader": False}
+
+    def open_book(b: Book) -> None:
+        state["reader"] = True
+        log.append(f"open:{b.title}")
+
+    def close_book() -> None:
+        log.append("close")
+        raise RuntimeError("「本を閉じる」ボタンが見つかりません")
+
+    results = run_all(
+        books,
+        out=tmp_path,
+        include_pdf=False,
+        only=None,
+        limit=None,
+        open_book=open_book,
+        close_book=close_book,
+        capture_book=lambda b, name: log.append("capture"),
+        in_reader=lambda: state["reader"],
+    )
+    assert [(r.book.title, r.status) for r in results] == [("閉じられない本", "failed")]
+    # 閉じ直しは 1 回だけ。次の本は open されない
+    assert log == ["open:閉じられない本", "capture", "close", "close"]
+
+
+def test_run_all_recovers_when_a_retry_close_returns_to_library(tmp_path: Path) -> None:
+    books = [_book("一度目は閉じない本"), _book("次の本")]
+    log: list[str] = []
+    state = {"reader": False, "close_calls": 0}
+
+    def open_book(b: Book) -> None:
+        state["reader"] = True
+        log.append(f"open:{b.title}")
+
+    def close_book() -> None:
+        state["close_calls"] += 1
+        log.append("close")
+        if state["close_calls"] == 1:
+            raise RuntimeError("「本を閉じる」ボタンが見つかりません")
+        state["reader"] = False
+
+    results = run_all(
+        books,
+        out=tmp_path,
+        include_pdf=False,
+        only=None,
+        limit=None,
+        open_book=open_book,
+        close_book=close_book,
+        capture_book=lambda b, name: log.append("capture"),
+        in_reader=lambda: state["reader"],
+    )
+    assert [(r.book.title, r.status) for r in results] == [
+        ("一度目は閉じない本", "failed"),
+        ("次の本", "captured"),
+    ]
+    assert log == [
+        "open:一度目は閉じない本",
+        "capture",
+        "close",
+        "close",
+        "open:次の本",
+        "capture",
+        "close",
+    ]
+
+
 # ---------------------------------------------------------------------------
 # dismiss_sheet (issue #86): 読書位置の同期シートは Escape で、書籍情報シートは AXPress で閉じる
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    ("buttons", "expect_escape", "expect_press", "expect_result"),
+    ("buttons", "expect_escape", "expect_pressed", "expect_result"),
     [
         # 同期シート: ハンドル「閉じる」+「最新の位置に移動」。AXPress は効かず Escape で消える
-        (["閉じる", "最新の位置に移動"], True, False, True),
-        (["閉じる", "位置182に戻る"], True, False, True),
+        (["閉じる", "最新の位置に移動"], True, [], True),
+        (["閉じる", "位置182に戻る"], True, [], True),
         # 書籍情報シート (サンプル): 従来どおり「閉じる」を AXPress
-        (["閉じる", "シェア"], False, True, True),
-        ([], False, False, False),
+        (["閉じる", "シェア"], False, ["閉じる"], True),
+        # ヒントのポップアップ (「勉強に役立つ機能 … OK」、issue #127): 出ている間はキー送りが
+        # 効かずページが止まる。「OK」を AXPress
+        (["OK"], False, ["OK"], True),
+        ([], False, [], False),
     ],
 )
 def test_dismiss_sheet_uses_escape_for_sync_sheet_and_press_for_info_sheet(
     monkeypatch: pytest.MonkeyPatch,
     buttons: list[str],
     expect_escape: bool,
-    expect_press: bool,
+    expect_pressed: list[str],
     expect_result: bool,
 ) -> None:
     from kindle_cap import library
@@ -356,4 +433,4 @@ def test_dismiss_sheet_uses_escape_for_sync_sheet_and_press_for_info_sheet(
 
     assert library.dismiss_sheet(object()) is expect_result
     assert (keys == [53]) is expect_escape
-    assert (pressed == ["閉じる"]) is expect_press
+    assert pressed == expect_pressed

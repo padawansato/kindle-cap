@@ -479,6 +479,7 @@ def capture_all(
         capture_book=capture_book,
         save_position=save_position if restore_position else None,
         restore_position=restore if restore_position else None,
+        in_reader=lambda: library.in_reader(app),
     )
     captured = [r for r in results if r.status == "captured"]
     failed = [r for r in results if r.status == "failed"]
